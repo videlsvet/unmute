@@ -442,6 +442,7 @@ class _UnmuteShellState extends State<UnmuteShell> {
                 body: DynamicGradientBackground(
                   artwork: _playerController.currentTrack?.image,
                   child: SafeArea(
+                    bottom: false,
                     child: Column(
                       children: [
                         Expanded(
@@ -458,10 +459,10 @@ class _UnmuteShellState extends State<UnmuteShell> {
                               Expanded(
                                 child: Padding(
                                   padding: EdgeInsets.fromLTRB(
-                                    isMobile ? 10 : 16,
-                                    isMobile ? 10 : 16,
-                                    showRightPanel ? 14 : (isMobile ? 10 : 16),
-                                    isMobile ? 4 : 10,
+                                    isMobile ? 0 : 16,
+                                    isMobile ? 0 : 16,
+                                    showRightPanel ? 14 : (isMobile ? 0 : 16),
+                                    isMobile ? 0 : 10,
                                   ),
                                   child: AnimatedSwitcher(
                                     duration: const Duration(milliseconds: 260),
@@ -539,15 +540,15 @@ class _MobileBottomNavBar extends StatelessWidget {
 
     return Container(
       decoration: BoxDecoration(
-        color: AppTheme.surface.withValues(alpha: 0.96),
+        color: const Color(0xFF140F12).withValues(alpha: 0.98),
         border: Border(
           top: BorderSide(
             color: Colors.white.withValues(alpha: 0.08),
-            width: 0.8,
+            width: 0.6,
           ),
         ),
       ),
-      padding: const EdgeInsets.only(top: 4, bottom: 2),
+      padding: const EdgeInsets.only(top: 6, bottom: 4),
       child: SafeArea(
         top: false,
         child: Row(
@@ -555,25 +556,25 @@ class _MobileBottomNavBar extends StatelessWidget {
           children: items.map((item) {
             final active = current == item.$1;
             return InkWell(
-              borderRadius: BorderRadius.circular(14),
+              borderRadius: BorderRadius.circular(16),
               onTap: () => onChanged(item.$1),
               child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     Icon(
                       item.$3,
-                      size: 22,
-                      color: active ? AppTheme.accent2 : AppTheme.textMuted,
+                      size: 24,
+                      color: active ? AppTheme.accent2 : Colors.white.withValues(alpha: 0.45),
                     ),
-                    const SizedBox(height: 2),
+                    const SizedBox(height: 3),
                     Text(
                       item.$2,
                       style: TextStyle(
                         fontSize: 10.5,
-                        fontWeight: active ? FontWeight.bold : FontWeight.w500,
-                        color: active ? Colors.white : AppTheme.textMuted,
+                        fontWeight: active ? FontWeight.w700 : FontWeight.w500,
+                        color: active ? Colors.white : Colors.white.withValues(alpha: 0.45),
                       ),
                     ),
                   ],

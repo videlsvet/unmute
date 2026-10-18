@@ -10,6 +10,7 @@ import '../theme/app_theme.dart';
 import '../widgets/brand_mark.dart';
 import '../widgets/disc_beat_glow.dart';
 import '../widgets/premium_components.dart';
+import '../widgets/ui_kit.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({
@@ -93,15 +94,114 @@ class _HomePageState extends State<HomePage> {
     return true;
   }
 
+  String get _timeGreeting {
+    final hour = DateTime.now().hour;
+    if (hour >= 5 && hour < 12) return 'Доброе утро';
+    if (hour >= 12 && hour < 18) return 'Добрый день';
+    return 'Добрый вечер';
+  }
+
   @override
   Widget build(BuildContext context) {
+    final width = MediaQuery.sizeOf(context).width;
+    final isMobile = width < 720;
     final queue = widget.playerController.queue;
     final favoriteTracks = _favorites.take(10).toList(growable: false);
     final recentTracks = queue.take(10).toList(growable: false);
 
     return AnimatedBuilder(
-      animation: Listenable.merge([widget.playerController, widget.waveController]),
+      animation:
+          Listenable.merge([widget.playerController, widget.waveController]),
       builder: (context, _) {
+        if (isMobile) {
+          return ListView(
+            padding: const EdgeInsets.fromLTRB(0, 10, 0, 32),
+            children: [
+              // Top Greeting & Brand
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 4, 16, 14),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      _timeGreeting,
+                      style: const TextStyle(
+                        fontSize: 24,
+                        fontWeight: FontWeight.w800,
+                        color: Colors.white,
+                        letterSpacing: -0.5,
+                      ),
+                    ),
+                    const BrandMark(size: 32, padding: 4, glow: false),
+                  ],
+                ),
+              ),
+
+              // Spotify 6-Grid Quick Access
+              _SpotifyMobileQuickGrid(
+                favorites: _favorites,
+                waveRunning: widget.waveController.isRunning,
+                onOpenFavorites: widget.onOpenFavorites,
+                onOpenWave: widget.onOpenWave,
+                onPlayTrack: (track) => widget.playerController.playTrack(track),
+              ),
+
+              const SizedBox(height: 18),
+
+              // Compact Spotify Wave Banner
+              _SpotifyMobileWaveBanner(
+                currentTrack: widget.playerController.currentTrack,
+                isPlaying: widget.playerController.isPlaying,
+                waveController: widget.waveController,
+                playerController: widget.playerController,
+                onOpenWave: widget.onOpenWave,
+              ),
+
+              const SizedBox(height: 24),
+
+              // Tracks for you
+              _TrackRail(
+                title: 'Для тебя',
+                subtitle: 'Быстрый доступ к тому, что уже собрано в UNMUTE.',
+                tracks: favoriteTracks.isNotEmpty
+                    ? favoriteTracks
+                    : recentTracks,
+                loading: _loading && favoriteTracks.isEmpty,
+                emptyTitle: 'Пока нечего рекомендовать',
+                emptySubtitle:
+                    'Запусти поиск или добавь треки в избранное, и эта зона оживёт.',
+                onPlay: (index, tracks) => widget.playerController
+                    .playTracks(tracks, startIndex: index),
+              ),
+
+              const SizedBox(height: 24),
+
+              // Mood Rail
+              const _MoodRail(),
+
+              const SizedBox(height: 24),
+
+              // Recently played
+              _TrackRail(
+                title: 'Недавно прослушано',
+                subtitle: 'Текущая очередь и последние запущенные треки.',
+                tracks: recentTracks,
+                loading: false,
+                emptyTitle: 'Очередь пока пустая',
+                emptySubtitle:
+                    'Когда включите музыку, последние треки появятся здесь.',
+                onPlay: (index, tracks) => widget.playerController
+                    .playTracks(tracks, startIndex: index),
+              ),
+
+              const SizedBox(height: 24),
+
+              // Playlists
+              _PlaylistSection(playlists: _playlists, loading: _loading),
+            ],
+          );
+        }
+
         return ListView(
           padding: const EdgeInsets.fromLTRB(4, 0, 4, 26),
           children: [
@@ -129,8 +229,10 @@ class _HomePageState extends State<HomePage> {
               tracks: favoriteTracks.isNotEmpty ? favoriteTracks : recentTracks,
               loading: _loading && favoriteTracks.isEmpty,
               emptyTitle: 'Пока нечего рекомендовать',
-              emptySubtitle: 'Запусти поиск или добавь треки в избранное, и эта зона оживёт.',
-              onPlay: (index, tracks) => widget.playerController.playTracks(tracks, startIndex: index),
+              emptySubtitle:
+                  'Запусти поиск или добавь треки в избранное, и эта зона оживёт.',
+              onPlay: (index, tracks) => widget.playerController
+                  .playTracks(tracks, startIndex: index),
             ),
             const SizedBox(height: 24),
             const _MoodRail(),
@@ -141,14 +243,304 @@ class _HomePageState extends State<HomePage> {
               tracks: recentTracks,
               loading: false,
               emptyTitle: 'Очередь пока пустая',
-              emptySubtitle: 'Когда включите музыку, последние треки появятся здесь.',
-              onPlay: (index, tracks) => widget.playerController.playTracks(tracks, startIndex: index),
+              emptySubtitle:
+                  'Когда включите музыку, последние треки появятся здесь.',
+              onPlay: (index, tracks) => widget.playerController
+                  .playTracks(tracks, startIndex: index),
             ),
             const SizedBox(height: 24),
             _PlaylistSection(playlists: _playlists, loading: _loading),
           ],
         );
       },
+    );
+  }
+}
+
+class _SpotifyMobileQuickGrid extends StatelessWidget {
+  const _SpotifyMobileQuickGrid({
+    required this.favorites,
+    required this.waveRunning,
+    required this.onOpenFavorites,
+    required this.onOpenWave,
+    required this.onPlayTrack,
+  });
+
+  final List<Track> favorites;
+  final bool waveRunning;
+  final VoidCallback onOpenFavorites;
+  final VoidCallback onOpenWave;
+  final ValueChanged<Track> onPlayTrack;
+
+  @override
+  Widget build(BuildContext context) {
+    final quickItems = <Widget>[
+      _QuickGridCard(
+        title: 'Любимые треки',
+        leading: Container(
+          width: 52,
+          height: 52,
+          decoration: const BoxDecoration(
+            borderRadius: BorderRadius.horizontal(left: Radius.circular(6)),
+            gradient: LinearGradient(
+              colors: [AppTheme.accent, AppTheme.accentWarm],
+            ),
+          ),
+          child:
+              const Icon(Icons.favorite_rounded, color: Colors.white, size: 24),
+        ),
+        onTap: onOpenFavorites,
+      ),
+      _QuickGridCard(
+        title: 'Моя Волна',
+        leading: Container(
+          width: 52,
+          height: 52,
+          decoration: BoxDecoration(
+            borderRadius:
+                const BorderRadius.horizontal(left: Radius.circular(6)),
+            gradient: LinearGradient(
+              colors: [
+                waveRunning ? AppTheme.accent2 : AppTheme.accent,
+                const Color(0xFF2A1520),
+              ],
+            ),
+          ),
+          child: Icon(
+            waveRunning ? Icons.graphic_eq_rounded : Icons.waves_rounded,
+            color: Colors.white,
+            size: 24,
+          ),
+        ),
+        onTap: onOpenWave,
+      ),
+    ];
+
+    for (var i = 0; i < favorites.length && quickItems.length < 6; i++) {
+      final track = favorites[i];
+      quickItems.add(
+        _QuickGridCard(
+          title: track.title,
+          leading: ClipRRect(
+            borderRadius:
+                const BorderRadius.horizontal(left: Radius.circular(6)),
+            child: UnmuteArtwork(
+              imageUrl: track.image,
+              size: 52,
+              radius: 0,
+            ),
+          ),
+          onTap: () => onPlayTrack(track),
+        ),
+      );
+    }
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: GridView.count(
+        shrinkWrap: true,
+        physics: const NeverScrollableScrollPhysics(),
+        crossAxisCount: 2,
+        mainAxisSpacing: 8,
+        crossAxisSpacing: 8,
+        childAspectRatio: 3.1,
+        children: quickItems,
+      ),
+    );
+  }
+}
+
+class _QuickGridCard extends StatelessWidget {
+  const _QuickGridCard({
+    required this.title,
+    required this.leading,
+    required this.onTap,
+  });
+
+  final String title;
+  final Widget leading;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        color: AppTheme.surfaceRaised.withValues(alpha: 0.85),
+        borderRadius: BorderRadius.circular(6),
+        border: Border.all(
+          color: Colors.white.withValues(alpha: 0.06),
+          width: 0.6,
+        ),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: onTap,
+          child: Row(
+            children: [
+              leading,
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  title,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                    color: Colors.white,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 6),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _SpotifyMobileWaveBanner extends StatelessWidget {
+  const _SpotifyMobileWaveBanner({
+    required this.currentTrack,
+    required this.isPlaying,
+    required this.waveController,
+    required this.playerController,
+    required this.onOpenWave,
+  });
+
+  final Track? currentTrack;
+  final bool isPlaying;
+  final WaveController waveController;
+  final PlayerController playerController;
+  final VoidCallback onOpenWave;
+
+  @override
+  Widget build(BuildContext context) {
+    final isRunning = waveController.isRunning;
+
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 16),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(16),
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            AppTheme.accent.withValues(alpha: 0.42),
+            const Color(0xFF1E1016),
+            AppTheme.surfaceRaised,
+          ],
+        ),
+        border: Border.all(
+          color: AppTheme.accent.withValues(alpha: 0.35),
+          width: 0.8,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.35),
+            blurRadius: 18,
+            offset: const Offset(0, 8),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          MyWaveDisc(
+            spin: isRunning && isPlaying,
+            size: 72,
+            enabled: !waveController.isLoading,
+            artworkUrl: currentTrack?.image,
+            onPlayClick: () {
+              if (!isRunning) {
+                waveController.startWave(
+                  seedTrack: currentTrack,
+                  playerController: playerController,
+                );
+              } else {
+                playerController.togglePlayPause();
+              }
+            },
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Row(
+                  children: [
+                    Text(
+                      isRunning ? 'МОЯ ВОЛНА В ЭФИРЕ' : 'МОЯ ВОЛНА',
+                      style: const TextStyle(
+                        fontSize: 10.5,
+                        fontWeight: FontWeight.w800,
+                        color: AppTheme.accent2,
+                        letterSpacing: 0.8,
+                      ),
+                    ),
+                    if (isRunning) ...[
+                      const SizedBox(width: 6),
+                      const Icon(Icons.graphic_eq_rounded,
+                          size: 14, color: AppTheme.accent2),
+                    ],
+                  ],
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  isRunning && currentTrack != null
+                      ? currentTrack!.title
+                      : 'Бесконечный поток под твой вкус',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  isRunning && currentTrack != null
+                      ? currentTrack!.artist
+                      : 'Нажми диск или открой плеер',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontSize: 11.5,
+                    color: AppTheme.textSecondary,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          IconButton.filled(
+            style: IconButton.styleFrom(
+              backgroundColor: AppTheme.accent,
+              foregroundColor: Colors.white,
+            ),
+            icon: Icon(
+              isRunning && isPlaying
+                  ? Icons.pause_rounded
+                  : Icons.play_arrow_rounded,
+              size: 26,
+            ),
+            onPressed: () {
+              if (!isRunning) {
+                waveController.startWave(
+                  seedTrack: currentTrack,
+                  playerController: playerController,
+                );
+              } else {
+                playerController.togglePlayPause();
+              }
+            },
+          ),
+        ],
+      ),
     );
   }
 }
@@ -471,6 +863,65 @@ class _TrackRail extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isMobile = MediaQuery.sizeOf(context).width < 720;
+
+    if (isMobile) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: Text(
+              title,
+              style: const TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.w800,
+                color: Colors.white,
+                letterSpacing: -0.3,
+              ),
+            ),
+          ),
+          const SizedBox(height: 12),
+          if (loading)
+            const Padding(
+              padding: EdgeInsets.symmetric(horizontal: 16),
+              child: LoadingSkeleton(height: 140),
+            )
+          else if (tracks.isEmpty)
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: EmptyStateWidget(
+                title: emptyTitle,
+                subtitle: emptySubtitle,
+                icon: Icons.queue_music_rounded,
+              ),
+            )
+          else
+            SizedBox(
+              height: 216,
+              child: ListView.separated(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                scrollDirection: Axis.horizontal,
+                itemCount: tracks.length,
+                separatorBuilder: (_, __) => const SizedBox(width: 12),
+                itemBuilder: (context, index) {
+                  final track = tracks[index];
+                  return MediaCard(
+                    title: track.title,
+                    subtitle:
+                        track.artist.isEmpty ? track.source : track.artist,
+                    imageUrl: track.image,
+                    onPlay: track.hasPlayableUrl
+                        ? () => onPlay(index, tracks)
+                        : null,
+                  );
+                },
+              ),
+            ),
+        ],
+      );
+    }
+
     return PremiumSurface(
       padding: const EdgeInsets.all(18),
       child: Column(
@@ -489,7 +940,10 @@ class _TrackRail extends StatelessWidget {
               ],
             )
           else if (tracks.isEmpty)
-            EmptyStateWidget(title: emptyTitle, subtitle: emptySubtitle, icon: Icons.queue_music_rounded)
+            EmptyStateWidget(
+                title: emptyTitle,
+                subtitle: emptySubtitle,
+                icon: Icons.queue_music_rounded)
           else
             SizedBox(
               height: 238,
@@ -501,9 +955,12 @@ class _TrackRail extends StatelessWidget {
                   final track = tracks[index];
                   return MediaCard(
                     title: track.title,
-                    subtitle: track.artist.isEmpty ? track.source : track.artist,
+                    subtitle:
+                        track.artist.isEmpty ? track.source : track.artist,
                     imageUrl: track.image,
-                    onPlay: track.hasPlayableUrl ? () => onPlay(index, tracks) : null,
+                    onPlay: track.hasPlayableUrl
+                        ? () => onPlay(index, tracks)
+                        : null,
                   );
                 },
               ),
@@ -519,12 +976,86 @@ class _MoodRail extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isMobile = MediaQuery.sizeOf(context).width < 720;
     const items = [
       ('Night Drive', 'Deep electronic pulse', Icons.nightlight_round),
-      ('Red Room', 'Dark pop and velvet bass', Icons.local_fire_department_rounded),
+      (
+        'Red Room',
+        'Dark pop and velvet bass',
+        Icons.local_fire_department_rounded
+      ),
       ('Focus Noir', 'Minimal beats for work', Icons.blur_on_rounded),
       ('Afterhours', 'Late city atmosphere', Icons.bolt_rounded),
     ];
+
+    if (isMobile) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Padding(
+            padding: EdgeInsets.symmetric(horizontal: 16),
+            child: Text(
+              'Подборки по вайбу',
+              style: TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.w800,
+                color: Colors.white,
+                letterSpacing: -0.3,
+              ),
+            ),
+          ),
+          const SizedBox(height: 12),
+          SizedBox(
+            height: 120,
+            child: ListView.separated(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              scrollDirection: Axis.horizontal,
+              itemCount: items.length,
+              separatorBuilder: (_, __) => const SizedBox(width: 12),
+              itemBuilder: (context, index) {
+                final item = items[index];
+                return Container(
+                  width: 175,
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    color: AppTheme.surfaceRaised.withValues(alpha: 0.8),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: Colors.white.withValues(alpha: 0.08),
+                    ),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Icon(item.$3, color: AppTheme.accent2, size: 22),
+                      const Spacer(),
+                      Text(
+                        item.$1,
+                        style: const TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.white,
+                        ),
+                      ),
+                      const SizedBox(height: 3),
+                      Text(
+                        item.$2,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          fontSize: 11,
+                          color: AppTheme.textSecondary,
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              },
+            ),
+          ),
+        ],
+      );
+    }
 
     return PremiumSurface(
       padding: const EdgeInsets.all(18),
@@ -555,9 +1086,11 @@ class _MoodRail extends StatelessWidget {
                       children: [
                         Icon(item.$3, color: AppTheme.accent2),
                         const Spacer(),
-                        Text(item.$1, style: Theme.of(context).textTheme.titleLarge),
+                        Text(item.$1,
+                            style: Theme.of(context).textTheme.titleLarge),
                         const SizedBox(height: 5),
-                        Text(item.$2, style: Theme.of(context).textTheme.bodySmall),
+                        Text(item.$2,
+                            style: Theme.of(context).textTheme.bodySmall),
                       ],
                     ),
                   ),
@@ -579,6 +1112,102 @@ class _PlaylistSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isMobile = MediaQuery.sizeOf(context).width < 720;
+
+    if (isMobile) {
+      if (playlists.isEmpty && !loading) return const SizedBox.shrink();
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Padding(
+            padding: EdgeInsets.symmetric(horizontal: 16),
+            child: Text(
+              'Мои плейлисты',
+              style: TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.w800,
+                color: Colors.white,
+                letterSpacing: -0.3,
+              ),
+            ),
+          ),
+          const SizedBox(height: 12),
+          if (loading)
+            const Padding(
+              padding: EdgeInsets.symmetric(horizontal: 16),
+              child: LoadingSkeleton(height: 80),
+            )
+          else
+            SizedBox(
+              height: 100,
+              child: ListView.separated(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                scrollDirection: Axis.horizontal,
+                itemCount: playlists.length,
+                separatorBuilder: (_, __) => const SizedBox(width: 12),
+                itemBuilder: (context, index) {
+                  final playlist = playlists[index];
+                  return Container(
+                    width: 210,
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: AppTheme.surfaceRaised.withValues(alpha: 0.8),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: Colors.white.withValues(alpha: 0.08),
+                      ),
+                    ),
+                    child: Row(
+                      children: [
+                        Container(
+                          width: 44,
+                          height: 44,
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(8),
+                            gradient: const LinearGradient(
+                              colors: [AppTheme.accent, AppTheme.accentWarm],
+                            ),
+                          ),
+                          child: const Icon(Icons.library_music_rounded,
+                              color: Colors.white, size: 22),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Text(
+                                playlist.title,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w700,
+                                  color: Colors.white,
+                                ),
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                '${playlist.trackCount} треков',
+                                style: const TextStyle(
+                                  fontSize: 11,
+                                  color: AppTheme.textMuted,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                },
+              ),
+            ),
+        ],
+      );
+    }
+
     return PremiumSurface(
       padding: const EdgeInsets.all(18),
       child: Column(
@@ -594,7 +1223,8 @@ class _PlaylistSection extends StatelessWidget {
           else if (playlists.isEmpty)
             const EmptyStateWidget(
               title: 'Плейлистов пока нет',
-              subtitle: 'Создайте первую подборку или импортируйте музыку из сервиса.',
+              subtitle:
+                  'Создайте первую подборку или импортируйте музыку из сервиса.',
               icon: Icons.playlist_add_rounded,
             )
           else
@@ -619,7 +1249,8 @@ class _PlaylistSection extends StatelessWidget {
                               colors: [AppTheme.accent, AppTheme.accentWarm],
                             ),
                           ),
-                          child: const Icon(Icons.library_music_rounded, color: Colors.white),
+                          child: const Icon(Icons.library_music_rounded,
+                              color: Colors.white),
                         ),
                         const SizedBox(width: 12),
                         Expanded(
@@ -633,7 +1264,8 @@ class _PlaylistSection extends StatelessWidget {
                                 style: Theme.of(context).textTheme.titleMedium,
                               ),
                               const SizedBox(height: 4),
-                              Text('${playlist.trackCount} треков', style: Theme.of(context).textTheme.bodySmall),
+                              Text('${playlist.trackCount} треков',
+                                  style: Theme.of(context).textTheme.bodySmall),
                             ],
                           ),
                         ),

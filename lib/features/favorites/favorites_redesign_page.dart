@@ -332,6 +332,7 @@ class _FavoritesRedesignPageState extends State<FavoritesRedesignPage> {
 
   @override
   Widget build(BuildContext context) {
+    final isMobile = MediaQuery.sizeOf(context).width < 720;
     final visibleTracks = _visibleTracks;
     final uniqueSources = {
       'all',
@@ -340,94 +341,125 @@ class _FavoritesRedesignPageState extends State<FavoritesRedesignPage> {
           .where((source) => source.trim().isNotEmpty),
     }.toList(growable: false);
 
-    return PremiumSurface(
-      padding: EdgeInsets.zero,
-      shadow: true,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
+    final content = Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        if (isMobile)
+          _MobileFavoritesHeader(
+            total: _tracks.length,
+            visible: visibleTracks.length,
+            hasTracks: visibleTracks.isNotEmpty,
+            isPlaying: widget.playerController.isPlaying,
+            onPlayAll: () {
+              if (visibleTracks.isNotEmpty) {
+                widget.playerController
+                    .playTracks(visibleTracks, startIndex: 0);
+              }
+            },
+            onImport: _importFavoritesText,
+            onRefresh: _load,
+          )
+        else
           _LibraryHero(
             total: _tracks.length,
             visible: visibleTracks.length,
             onRefresh: _load,
             onImport: _importFavoritesText,
           ),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(22, 18, 22, 12),
-            child: _LibraryToolbar(
-              searchController: _searchController,
-              sort: _sort,
-              gridMode: _gridMode,
-              onSearchChanged: (_) => setState(() {}),
-              onSortChanged: (value) {
-                if (value == null) return;
-                setState(() => _sort = value);
-              },
-              onToggleView: () => setState(() => _gridMode = !_gridMode),
-            ),
+        Padding(
+          padding: EdgeInsets.fromLTRB(
+              isMobile ? 16 : 22, isMobile ? 8 : 18, isMobile ? 16 : 22, 12),
+          child: _LibraryToolbar(
+            searchController: _searchController,
+            sort: _sort,
+            gridMode: _gridMode,
+            onSearchChanged: (_) => setState(() {}),
+            onSortChanged: (value) {
+              if (value == null) return;
+              setState(() => _sort = value);
+            },
+            onToggleView: () => setState(() => _gridMode = !_gridMode),
           ),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(22, 0, 22, 14),
-            child: Wrap(
-              spacing: 10,
-              runSpacing: 10,
-              children: uniqueSources.map((source) {
+        ),
+        Padding(
+          padding: EdgeInsets.fromLTRB(
+              isMobile ? 16 : 22, 0, isMobile ? 16 : 22, 14),
+          child: SizedBox(
+            height: 32,
+            child: ListView.separated(
+              scrollDirection: Axis.horizontal,
+              itemCount: uniqueSources.length,
+              separatorBuilder: (_, __) => const SizedBox(width: 8),
+              itemBuilder: (context, index) {
+                final source = uniqueSources[index];
                 return FilterChipButton(
                   label: source == 'all' ? 'Все источники' : source,
                   selected: _sourceFilter == source,
                   onTap: () => setState(() => _sourceFilter = source),
                 );
-              }).toList(growable: false),
-            ),
-          ),
-          Expanded(
-            child: Builder(
-              builder: (context) {
-                if (_loading) {
-                  return const _LibrarySkeleton();
-                }
-                if ((_error ?? '').isNotEmpty) {
-                  return EmptyStateWidget(
-                    title: 'Медиатека недоступна',
-                    subtitle: _error!,
-                    icon: Icons.lock_outline_rounded,
-                    action: OutlinedButton.icon(
-                      onPressed: _load,
-                      icon: const Icon(Icons.refresh_rounded),
-                      label: const Text('Повторить'),
-                    ),
-                  );
-                }
-                if (_tracks.isEmpty) {
-                  return const EmptyStateWidget(
-                    title: 'Избранное пока пустое',
-                    subtitle:
-                        'Ставьте лайки в поиске, и треки появятся в этой медиатеке.',
-                    icon: Icons.favorite_border_rounded,
-                  );
-                }
-                if (visibleTracks.isEmpty) {
-                  return const EmptyStateWidget(
-                    title: 'Ничего не найдено',
-                    subtitle:
-                        'Измените поисковый запрос, источник или сортировку.',
-                    icon: Icons.filter_alt_off_rounded,
-                  );
-                }
-                return _gridMode
-                    ? _buildGrid(visibleTracks)
-                    : _buildList(visibleTracks);
               },
             ),
           ),
-        ],
-      ),
+        ),
+        Expanded(
+          child: Builder(
+            builder: (context) {
+              if (_loading) {
+                return const _LibrarySkeleton();
+              }
+              if ((_error ?? '').isNotEmpty) {
+                return EmptyStateWidget(
+                  title: 'Медиатека недоступна',
+                  subtitle: _error!,
+                  icon: Icons.lock_outline_rounded,
+                  action: OutlinedButton.icon(
+                    onPressed: _load,
+                    icon: const Icon(Icons.refresh_rounded),
+                    label: const Text('Повторить'),
+                  ),
+                );
+              }
+              if (_tracks.isEmpty) {
+                return const EmptyStateWidget(
+                  title: 'Избранное пока пустое',
+                  subtitle:
+                      'Ставьте лайки в поиске, и треки появятся в этой медиатеке.',
+                  icon: Icons.favorite_border_rounded,
+                );
+              }
+              if (visibleTracks.isEmpty) {
+                return const EmptyStateWidget(
+                  title: 'Ничего не найдено',
+                  subtitle:
+                      'Измените поисковый запрос, источник или сортировку.',
+                  icon: Icons.filter_alt_off_rounded,
+                );
+              }
+              return _gridMode
+                  ? _buildGrid(visibleTracks)
+                  : _buildList(visibleTracks);
+            },
+          ),
+        ),
+      ],
+    );
+
+    if (isMobile) {
+      return content;
+    }
+
+    return PremiumSurface(
+      padding: EdgeInsets.zero,
+      shadow: true,
+      child: content,
     );
   }
 
   Widget _buildList(List<Track> visibleTracks) {
+    final isMobile = MediaQuery.sizeOf(context).width < 720;
     return ListView.separated(
-      padding: const EdgeInsets.fromLTRB(22, 0, 22, 22),
+      padding: EdgeInsets.fromLTRB(
+          isMobile ? 16 : 22, 0, isMobile ? 16 : 22, 22),
       itemCount: visibleTracks.length,
       separatorBuilder: (_, __) => const SizedBox(height: 8),
       itemBuilder: (context, index) {
@@ -470,6 +502,131 @@ class _FavoritesRedesignPageState extends State<FavoritesRedesignPage> {
           onPlay: () => _playTrack(track),
         );
       },
+    );
+  }
+}
+
+class _MobileFavoritesHeader extends StatelessWidget {
+  const _MobileFavoritesHeader({
+    required this.total,
+    required this.visible,
+    required this.hasTracks,
+    required this.isPlaying,
+    required this.onPlayAll,
+    required this.onImport,
+    required this.onRefresh,
+  });
+
+  final int total;
+  final int visible;
+  final bool hasTracks;
+  final bool isPlaying;
+  final VoidCallback onPlayAll;
+  final VoidCallback onImport;
+  final VoidCallback onRefresh;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 60,
+                height: 60,
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(10),
+                  gradient: const LinearGradient(
+                    colors: [AppTheme.accent, AppTheme.accentWarm],
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: AppTheme.accent.withValues(alpha: 0.35),
+                      blurRadius: 14,
+                      offset: const Offset(0, 6),
+                    ),
+                  ],
+                ),
+                child: const Icon(Icons.favorite_rounded,
+                    color: Colors.white, size: 30),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Любимые треки',
+                      style: TextStyle(
+                        fontSize: 22,
+                        fontWeight: FontWeight.w800,
+                        color: Colors.white,
+                        letterSpacing: -0.4,
+                      ),
+                    ),
+                    const SizedBox(height: 3),
+                    Text(
+                      '$total треков',
+                      style: const TextStyle(
+                        fontSize: 13,
+                        color: AppTheme.textSecondary,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              IconButton(
+                icon: const Icon(Icons.playlist_add_check_rounded,
+                    color: Colors.white70),
+                tooltip: 'Импорт',
+                onPressed: onImport,
+              ),
+              IconButton(
+                icon: const Icon(Icons.refresh_rounded, color: Colors.white70),
+                tooltip: 'Обновить',
+                onPressed: onRefresh,
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                '$visible отображается',
+                style: const TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  color: AppTheme.textMuted,
+                ),
+              ),
+              Container(
+                width: 48,
+                height: 48,
+                decoration: const BoxDecoration(
+                  color: AppTheme.accent,
+                  shape: BoxShape.circle,
+                ),
+                child: IconButton(
+                  padding: EdgeInsets.zero,
+                  icon: Icon(
+                    isPlaying
+                        ? Icons.pause_rounded
+                        : Icons.play_arrow_rounded,
+                    color: Colors.white,
+                    size: 30,
+                  ),
+                  onPressed: hasTracks ? onPlayAll : null,
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
     );
   }
 }

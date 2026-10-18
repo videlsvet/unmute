@@ -44,7 +44,9 @@ class BottomPlayerBar extends StatelessWidget {
   Widget build(BuildContext context) {
     if (!controller.hasTrack) return const SizedBox.shrink();
 
-    final compact = MediaQuery.sizeOf(context).width < 980;
+    final screenWidth = MediaQuery.sizeOf(context).width;
+    final isMobile = screenWidth < 720;
+    final compact = screenWidth < 980;
     final track = controller.currentTrack!;
     final totalMs = controller.duration.inMilliseconds <= 0
         ? 1.0
@@ -72,6 +74,18 @@ class BottomPlayerBar extends StatelessWidget {
             return FadeTransition(opacity: animation, child: child);
           },
         ),
+      );
+    }
+
+    if (isMobile) {
+      return _SpotifyMiniPlayer(
+        controller: controller,
+        track: track,
+        isFavorite: isFavoriteTrack(track),
+        onToggleFavorite: onToggleFavorite,
+        totalMs: totalMs,
+        posMs: posMs,
+        onExpand: openFullscreen,
       );
     }
 
@@ -108,6 +122,142 @@ class BottomPlayerBar extends StatelessWidget {
                     onExpand: openFullscreen,
                   ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+class _SpotifyMiniPlayer extends StatelessWidget {
+  const _SpotifyMiniPlayer({
+    required this.controller,
+    required this.track,
+    required this.isFavorite,
+    required this.onToggleFavorite,
+    required this.totalMs,
+    required this.posMs,
+    required this.onExpand,
+  });
+
+  final player.PlayerController controller;
+  final Track track;
+  final bool isFavorite;
+  final ValueChanged<Track> onToggleFavorite;
+  final double totalMs;
+  final double posMs;
+  final VoidCallback onExpand;
+
+  @override
+  Widget build(BuildContext context) {
+    final progress = totalMs > 0 ? (posMs / totalMs).clamp(0.0, 1.0) : 0.0;
+
+    return Container(
+      margin: const EdgeInsets.fromLTRB(8, 0, 8, 4),
+      height: 56,
+      decoration: BoxDecoration(
+        color: AppTheme.surfaceRaised.withValues(alpha: 0.96),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(
+          color: Colors.white.withValues(alpha: 0.08),
+          width: 0.8,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.45),
+            blurRadius: 16,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: onExpand,
+          child: Column(
+            children: [
+              Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 10),
+                  child: Row(
+                    children: [
+                      UnmuteArtwork(
+                        imageUrl: track.image,
+                        size: 40,
+                        radius: 6,
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              track.title,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w600,
+                                color: Colors.white,
+                              ),
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              track.artist.isEmpty ? 'Unknown artist' : track.artist,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                fontSize: 11,
+                                color: AppTheme.textSecondary,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      IconButton(
+                        visualDensity: VisualDensity.compact,
+                        padding: EdgeInsets.zero,
+                        constraints:
+                            const BoxConstraints(minWidth: 38, minHeight: 38),
+                        icon: Icon(
+                          isFavorite
+                              ? Icons.favorite_rounded
+                              : Icons.favorite_border_rounded,
+                          size: 20,
+                          color: isFavorite
+                              ? AppTheme.accent2
+                              : AppTheme.textMuted,
+                        ),
+                        onPressed: () => onToggleFavorite(track),
+                      ),
+                      IconButton(
+                        visualDensity: VisualDensity.compact,
+                        padding: EdgeInsets.zero,
+                        constraints:
+                            const BoxConstraints(minWidth: 38, minHeight: 38),
+                        icon: Icon(
+                          controller.isPlaying
+                              ? Icons.pause_rounded
+                              : Icons.play_arrow_rounded,
+                          size: 28,
+                          color: Colors.white,
+                        ),
+                        onPressed: controller.togglePlayPause,
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              LinearProgressIndicator(
+                value: progress,
+                minHeight: 2,
+                backgroundColor: Colors.white.withValues(alpha: 0.08),
+                valueColor:
+                    const AlwaysStoppedAnimation<Color>(AppTheme.accent2),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -442,7 +592,302 @@ class _FullscreenPlayer extends StatefulWidget {
 }
 
 class _FullscreenPlayerState extends State<_FullscreenPlayer> {
-  bool _showLyrics = true;
+  bool _showLyrics = false;
+
+  String _fmt(Duration d) {
+    final total = d.inSeconds;
+    final m = (total ~/ 60).toString();
+    final s = (total % 60).toString().padLeft(2, '0');
+    return '$m:$s';
+  }
+
+  Widget _buildSpotifyMobileFullscreen(
+    BuildContext context,
+    player.PlayerController controller,
+    Track track,
+    double totalMs,
+    double posMs,
+    BoxConstraints constraints,
+  ) {
+    final isFavorite = widget.isFavoriteTrack(track);
+    final artworkSize =
+        (constraints.maxWidth - 56).clamp(200.0, constraints.maxHeight * 0.42);
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 8, 20, 16),
+      child: Column(
+        children: [
+          // Header: Chevron Down | Now Playing badge | Lyrics toggle
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              IconButton(
+                icon: const Icon(Icons.keyboard_arrow_down_rounded,
+                    size: 34, color: Colors.white),
+                onPressed: () => Navigator.of(context).pop(),
+              ),
+              Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    'СЕЙЧАС ИГРАЕТ',
+                    style: TextStyle(
+                      fontSize: 10,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: 1.2,
+                      color: Colors.white.withValues(alpha: 0.7),
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    track.source.isNotEmpty
+                        ? track.source.toUpperCase()
+                        : 'UNMUTE',
+                    style: const TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white,
+                    ),
+                  ),
+                ],
+              ),
+              IconButton(
+                icon: Icon(
+                  _showLyrics ? Icons.lyrics_rounded : Icons.lyrics_outlined,
+                  color: _showLyrics ? AppTheme.accent2 : Colors.white70,
+                  size: 24,
+                ),
+                onPressed: () => setState(() => _showLyrics = !_showLyrics),
+              ),
+            ],
+          ),
+
+          const Spacer(),
+
+          // Center: Artwork or Lyrics
+          if (_showLyrics)
+            Container(
+              height: artworkSize,
+              width: double.infinity,
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.black.withValues(alpha: 0.35),
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(
+                  color: Colors.white.withValues(alpha: 0.08),
+                ),
+              ),
+              child: _FullscreenLyricsView(
+                controller: controller,
+                track: track,
+              ),
+            )
+          else
+            Container(
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(16),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.6),
+                    blurRadius: 32,
+                    offset: const Offset(0, 16),
+                  ),
+                ],
+              ),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(16),
+                child: UnmuteArtwork(
+                  imageUrl: track.image,
+                  size: artworkSize,
+                  radius: 16,
+                ),
+              ),
+            ),
+
+          const Spacer(),
+
+          // Track Title, Artist & Like button
+          Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      track.title,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontSize: 22,
+                        fontWeight: FontWeight.w800,
+                        color: Colors.white,
+                        letterSpacing: -0.4,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      track.artist.isEmpty ? 'Unknown artist' : track.artist,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontSize: 15,
+                        color: AppTheme.textSecondary,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              IconButton(
+                icon: Icon(
+                  isFavorite
+                      ? Icons.favorite_rounded
+                      : Icons.favorite_border_rounded,
+                  color: isFavorite ? AppTheme.accent2 : Colors.white70,
+                  size: 28,
+                ),
+                onPressed: () => widget.onToggleFavorite(track),
+              ),
+            ],
+          ),
+
+          const SizedBox(height: 14),
+
+          // Spotify Scrubber Slider
+          SliderTheme(
+            data: SliderTheme.of(context).copyWith(
+              trackHeight: 3.5,
+              thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 6),
+              overlayShape: const RoundSliderOverlayShape(overlayRadius: 14),
+              activeTrackColor: Colors.white,
+              inactiveTrackColor: Colors.white.withValues(alpha: 0.2),
+              thumbColor: Colors.white,
+            ),
+            child: Slider(
+              value: posMs,
+              min: 0,
+              max: totalMs,
+              onChanged: (v) =>
+                  controller.seek(Duration(milliseconds: v.toInt())),
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 4),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  _fmt(controller.position),
+                  style: const TextStyle(
+                    fontSize: 12,
+                    color: AppTheme.textMuted,
+                  ),
+                ),
+                Text(
+                  _fmt(controller.duration),
+                  style: const TextStyle(
+                    fontSize: 12,
+                    color: AppTheme.textMuted,
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+          const SizedBox(height: 10),
+
+          // Spotify Transport Controls
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              IconButton(
+                icon: Icon(
+                  Icons.shuffle_rounded,
+                  size: 24,
+                  color: controller.shuffleEnabled
+                      ? AppTheme.accent2
+                      : Colors.white54,
+                ),
+                onPressed: controller.toggleShuffle,
+              ),
+              IconButton(
+                icon: const Icon(
+                  Icons.skip_previous_rounded,
+                  size: 38,
+                  color: Colors.white,
+                ),
+                onPressed:
+                    controller.canPlayPrevious ? controller.playPrevious : null,
+              ),
+              Container(
+                width: 64,
+                height: 64,
+                decoration: const BoxDecoration(
+                  color: Colors.white,
+                  shape: BoxShape.circle,
+                ),
+                child: IconButton(
+                  padding: EdgeInsets.zero,
+                  icon: Icon(
+                    controller.isPlaying
+                        ? Icons.pause_rounded
+                        : Icons.play_arrow_rounded,
+                    color: Colors.black,
+                    size: 38,
+                  ),
+                  onPressed: controller.togglePlayPause,
+                ),
+              ),
+              IconButton(
+                icon: const Icon(
+                  Icons.skip_next_rounded,
+                  size: 38,
+                  color: Colors.white,
+                ),
+                onPressed: controller.canPlayNext ? controller.playNext : null,
+              ),
+              IconButton(
+                icon: Icon(
+                  switch (controller.repeatMode) {
+                    player.RepeatMode.one => Icons.repeat_one_rounded,
+                    _ => Icons.repeat_rounded,
+                  },
+                  size: 24,
+                  color: controller.repeatMode != player.RepeatMode.off
+                      ? AppTheme.accent2
+                      : Colors.white54,
+                ),
+                onPressed: controller.cycleRepeatMode,
+              ),
+            ],
+          ),
+
+          const SizedBox(height: 12),
+
+          // Bottom Info Row
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              ServiceChip(label: track.source),
+              if ((track.albumTitle ?? '').isNotEmpty)
+                Flexible(
+                  child: Text(
+                    track.albumTitle!,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontSize: 12,
+                      color: AppTheme.textMuted,
+                    ),
+                  ),
+                ),
+            ],
+          ),
+          const SizedBox(height: 4),
+        ],
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -469,152 +914,171 @@ class _FullscreenPlayerState extends State<_FullscreenPlayer> {
           body: DynamicGradientBackground(
             artwork: track.image,
             child: SafeArea(
-              child: Padding(
-                padding: const EdgeInsets.all(24),
-                child: Column(
-                  children: [
-                    Row(
+              child: LayoutBuilder(
+                builder: (context, constraints) {
+                  if (constraints.maxWidth < 650) {
+                    return _buildSpotifyMobileFullscreen(
+                      context,
+                      controller,
+                      track,
+                      totalMs,
+                      posMs,
+                      constraints,
+                    );
+                  }
+
+                  return Padding(
+                    padding: const EdgeInsets.all(24),
+                    child: Column(
                       children: [
-                        Text('UNMUTE',
-                            style: Theme.of(context).textTheme.titleLarge),
-                        const Spacer(),
-                        PremiumIconButton(
-                          icon: widget.isFavoriteTrack(track)
-                              ? Icons.favorite_rounded
-                              : Icons.favorite_border_rounded,
-                          selected: widget.isFavoriteTrack(track),
-                          tooltip: 'Like',
-                          onTap: () => widget.onToggleFavorite(track),
+                        Row(
+                          children: [
+                            Text('UNMUTE',
+                                style: Theme.of(context).textTheme.titleLarge),
+                            const Spacer(),
+                            PremiumIconButton(
+                              icon: widget.isFavoriteTrack(track)
+                                  ? Icons.favorite_rounded
+                                  : Icons.favorite_border_rounded,
+                              selected: widget.isFavoriteTrack(track),
+                              tooltip: 'Like',
+                              onTap: () => widget.onToggleFavorite(track),
+                            ),
+                            const SizedBox(width: 8),
+                            PremiumIconButton(
+                              icon: _showLyrics
+                                  ? Icons.lyrics_rounded
+                                  : Icons.lyrics_outlined,
+                              selected: _showLyrics,
+                              tooltip: 'Lyrics',
+                              onTap: () =>
+                                  setState(() => _showLyrics = !_showLyrics),
+                            ),
+                            const SizedBox(width: 8),
+                            PremiumIconButton(
+                              icon: Icons.close_fullscreen_rounded,
+                              tooltip: 'Close',
+                              onTap: () => Navigator.of(context).pop(),
+                            ),
+                          ],
                         ),
-                        const SizedBox(width: 8),
-                        PremiumIconButton(
-                          icon: _showLyrics
-                              ? Icons.lyrics_rounded
-                              : Icons.lyrics_outlined,
-                          selected: _showLyrics,
-                          tooltip: 'Lyrics',
-                          onTap: () =>
-                              setState(() => _showLyrics = !_showLyrics),
+                        const SizedBox(height: 18),
+                        Expanded(
+                          child: LayoutBuilder(
+                            builder: (context, innerConstraints) {
+                              final artworkSize = innerConstraints.maxWidth < 720
+                                  ? 180.0
+                                  : 360.0;
+                              if (!_showLyrics) {
+                                return Center(
+                                  child: _FullscreenTrackInfo(
+                                    track: track,
+                                    artworkSize: artworkSize,
+                                  ),
+                                );
+                              }
+                              return Row(
+                                crossAxisAlignment: CrossAxisAlignment.center,
+                                children: [
+                                  Expanded(
+                                    flex: 6,
+                                    child: Align(
+                                      alignment: Alignment.centerRight,
+                                      child: Column(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          UnmuteArtwork(
+                                            imageUrl: track.image,
+                                            size: artworkSize,
+                                            radius: AppTheme.radiusXl,
+                                          ),
+                                          const SizedBox(height: 28),
+                                          ConstrainedBox(
+                                            constraints: const BoxConstraints(
+                                                maxWidth: 760),
+                                            child: Column(
+                                              children: [
+                                                Text(
+                                                  track.title,
+                                                  maxLines: 2,
+                                                  overflow:
+                                                      TextOverflow.ellipsis,
+                                                  textAlign: TextAlign.center,
+                                                  style: Theme.of(context)
+                                                      .textTheme
+                                                      .displayMedium,
+                                                ),
+                                                const SizedBox(height: 8),
+                                                Text(
+                                                  track.artist.isEmpty
+                                                      ? 'Unknown artist'
+                                                      : track.artist,
+                                                  maxLines: 1,
+                                                  overflow:
+                                                      TextOverflow.ellipsis,
+                                                  textAlign: TextAlign.center,
+                                                  style: Theme.of(context)
+                                                      .textTheme
+                                                      .titleMedium,
+                                                ),
+                                                const SizedBox(height: 4),
+                                                Text(
+                                                  (track.albumTitle ?? '')
+                                                          .trim()
+                                                          .isEmpty
+                                                      ? 'Альбом не указан'
+                                                      : track.albumTitle!,
+                                                  maxLines: 1,
+                                                  overflow:
+                                                      TextOverflow.ellipsis,
+                                                  textAlign: TextAlign.center,
+                                                  style: Theme.of(context)
+                                                      .textTheme
+                                                      .bodySmall,
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 18),
+                                  Expanded(
+                                    flex: 6,
+                                    child: SizedBox(
+                                      height: artworkSize,
+                                      child: _FullscreenLyricsView(
+                                        controller: controller,
+                                        track: track,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              );
+                            },
+                          ),
                         ),
-                        const SizedBox(width: 8),
-                        PremiumIconButton(
-                          icon: Icons.close_fullscreen_rounded,
-                          tooltip: 'Close',
-                          onTap: () => Navigator.of(context).pop(),
+                        const SizedBox(height: 18),
+                        ConstrainedBox(
+                          constraints: const BoxConstraints(maxWidth: 760),
+                          child: _Transport(
+                              controller: controller,
+                              totalMs: totalMs,
+                              posMs: posMs),
+                        ),
+                        const SizedBox(height: 18),
+                        ConstrainedBox(
+                          constraints: const BoxConstraints(maxWidth: 760),
+                          child: _UtilityControls(
+                            controller: controller,
+                            onExpand: () => Navigator.of(context).pop(),
+                          ),
                         ),
                       ],
                     ),
-                    const SizedBox(height: 18),
-                    Expanded(
-                      child: LayoutBuilder(
-                        builder: (context, constraints) {
-                          final artworkSize =
-                              constraints.maxWidth < 720 ? 180.0 : 360.0;
-                          if (!_showLyrics) {
-                            return Center(
-                              child: _FullscreenTrackInfo(
-                                track: track,
-                                artworkSize: artworkSize,
-                              ),
-                            );
-                          }
-                          return Row(
-                            crossAxisAlignment: CrossAxisAlignment.center,
-                            children: [
-                              Expanded(
-                                flex: 6,
-                                child: Align(
-                                  alignment: Alignment.centerRight,
-                                  child: Column(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      UnmuteArtwork(
-                                        imageUrl: track.image,
-                                        size: artworkSize,
-                                        radius: AppTheme.radiusXl,
-                                      ),
-                                      const SizedBox(height: 28),
-                                      ConstrainedBox(
-                                        constraints:
-                                            const BoxConstraints(maxWidth: 760),
-                                        child: Column(
-                                          children: [
-                                            Text(
-                                              track.title,
-                                              maxLines: 2,
-                                              overflow: TextOverflow.ellipsis,
-                                              textAlign: TextAlign.center,
-                                              style: Theme.of(context)
-                                                  .textTheme
-                                                  .displayMedium,
-                                            ),
-                                            const SizedBox(height: 8),
-                                            Text(
-                                              track.artist.isEmpty
-                                                  ? 'Unknown artist'
-                                                  : track.artist,
-                                              maxLines: 1,
-                                              overflow: TextOverflow.ellipsis,
-                                              textAlign: TextAlign.center,
-                                              style: Theme.of(context)
-                                                  .textTheme
-                                                  .titleMedium,
-                                            ),
-                                            const SizedBox(height: 4),
-                                            Text(
-                                              (track.albumTitle ?? '')
-                                                      .trim()
-                                                      .isEmpty
-                                                  ? 'Альбом не указан'
-                                                  : track.albumTitle!,
-                                              maxLines: 1,
-                                              overflow: TextOverflow.ellipsis,
-                                              textAlign: TextAlign.center,
-                                              style: Theme.of(context)
-                                                  .textTheme
-                                                  .bodySmall,
-                                            ),
-                                          ],
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ),
-                              const SizedBox(width: 18),
-                              Expanded(
-                                flex: 6,
-                                child: SizedBox(
-                                  height: artworkSize,
-                                  child: _FullscreenLyricsView(
-                                    controller: controller,
-                                    track: track,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          );
-                        },
-                      ),
-                    ),
-                    const SizedBox(height: 18),
-                    ConstrainedBox(
-                      constraints: const BoxConstraints(maxWidth: 760),
-                      child: _Transport(
-                          controller: controller,
-                          totalMs: totalMs,
-                          posMs: posMs),
-                    ),
-                    const SizedBox(height: 18),
-                    ConstrainedBox(
-                      constraints: const BoxConstraints(maxWidth: 760),
-                      child: _UtilityControls(
-                        controller: controller,
-                        onExpand: () => Navigator.of(context).pop(),
-                      ),
-                    ),
-                  ],
-                ),
+                  );
+                },
               ),
             ),
           ),

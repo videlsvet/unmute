@@ -243,6 +243,46 @@ class _SearchRedesignPageState extends State<SearchRedesignPage> {
 
   @override
   Widget build(BuildContext context) {
+    final isMobile = MediaQuery.sizeOf(context).width < 720;
+
+    if (isMobile) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _MobileSearchHeader(
+            controller: _queryController,
+            service: _service,
+            loading: _loading,
+            onChanged: _scheduleSearch,
+            onSubmitted: (_) => _search(),
+            onClear: () {
+              _queryController.clear();
+              setState(() {
+                _activeQuery = '';
+                _tracks.clear();
+                _artists.clear();
+              });
+            },
+            onServiceChanged: (value) {
+              setState(() => _service = value);
+              if (_activeQuery.isNotEmpty) {
+                _search();
+              }
+            },
+          ),
+          if (_activeQuery.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
+              child: _SearchTabs(
+                tab: _tab,
+                onChanged: (tab) => setState(() => _tab = tab),
+              ),
+            ),
+          Expanded(child: _buildResults()),
+        ],
+      );
+    }
+
     return PremiumSurface(
       padding: EdgeInsets.zero,
       shadow: true,
@@ -279,6 +319,8 @@ class _SearchRedesignPageState extends State<SearchRedesignPage> {
   }
 
   Widget _buildResults() {
+    final isMobile = MediaQuery.sizeOf(context).width < 720;
+
     if ((_error ?? '').isNotEmpty) {
       return EmptyStateWidget(
         title: 'Поиск не удался',
@@ -321,7 +363,8 @@ class _SearchRedesignPageState extends State<SearchRedesignPage> {
 
     return ListView(
       controller: _scrollController,
-      padding: const EdgeInsets.fromLTRB(22, 0, 22, 22),
+      padding: EdgeInsets.fromLTRB(
+          isMobile ? 16 : 22, 0, isMobile ? 16 : 22, 22),
       children: [
         if (showArtists && _artists.isNotEmpty) ...[
           SectionHeader(
@@ -599,6 +642,162 @@ class _SearchTabs extends StatelessWidget {
   }
 }
 
+class _GenreCardData {
+  final String title;
+  final List<Color> colors;
+  final IconData icon;
+
+  const _GenreCardData(this.title, this.colors, this.icon);
+}
+
+const _kSpotifyGenres = [
+  _GenreCardData(
+      'Поп', [Color(0xFF8D1456), Color(0xFFC2185B)], Icons.music_note_rounded),
+  _GenreCardData('Хип-хоп', [Color(0xFFBA4B06), Color(0xFFE65100)],
+      Icons.speaker_group_rounded),
+  _GenreCardData('Рок', [Color(0xFF8B0000), Color(0xFFB71C1C)],
+      Icons.electric_bolt_rounded),
+  _GenreCardData('Электроника', [Color(0xFF1E3A8A), Color(0xFF0D47A1)],
+      Icons.headphones_rounded),
+  _GenreCardData('Инди', [Color(0xFF2E7D32), Color(0xFF1B5E20)],
+      Icons.nature_people_rounded),
+  _GenreCardData(
+      'Чилл', [Color(0xFF4A148C), Color(0xFF6A1B9A)], Icons.nightlight_round),
+  _GenreCardData('Танцевальная', [Color(0xFFE65100), Color(0xFFF57F17)],
+      Icons.flash_on_rounded),
+  _GenreCardData('Метал', [Color(0xFF263238), Color(0xFF37474F)],
+      Icons.surround_sound_rounded),
+];
+
+class _MobileSearchHeader extends StatelessWidget {
+  const _MobileSearchHeader({
+    required this.controller,
+    required this.service,
+    required this.loading,
+    required this.onChanged,
+    required this.onSubmitted,
+    required this.onClear,
+    required this.onServiceChanged,
+  });
+
+  final TextEditingController controller;
+  final String service;
+  final bool loading;
+  final ValueChanged<String> onChanged;
+  final ValueChanged<String> onSubmitted;
+  final VoidCallback onClear;
+  final ValueChanged<String> onServiceChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final services = [
+      ('Яндекс Музыка', 'yandex'),
+      ('VK Музыка', 'vkmusic'),
+      ('SoundCloud', 'soundcloud'),
+      ('Spotify', 'spotify'),
+    ];
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Поиск',
+            style: TextStyle(
+              fontSize: 28,
+              fontWeight: FontWeight.w800,
+              color: Colors.white,
+              letterSpacing: -0.5,
+            ),
+          ),
+          const SizedBox(height: 12),
+          Container(
+            height: 46,
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.12),
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(
+                color: Colors.white.withValues(alpha: 0.08),
+                width: 0.8,
+              ),
+            ),
+            child: TextField(
+              controller: controller,
+              style: const TextStyle(color: Colors.white, fontSize: 15),
+              cursorColor: AppTheme.accent2,
+              onChanged: onChanged,
+              onSubmitted: onSubmitted,
+              decoration: InputDecoration(
+                border: InputBorder.none,
+                contentPadding: const EdgeInsets.symmetric(vertical: 12),
+                prefixIcon: Icon(
+                  loading ? Icons.sync_rounded : Icons.search_rounded,
+                  color: Colors.white.withValues(alpha: 0.6),
+                  size: 22,
+                ),
+                suffixIcon: controller.text.isNotEmpty
+                    ? IconButton(
+                        icon: const Icon(Icons.close_rounded,
+                            size: 20, color: Colors.white70),
+                        onPressed: onClear,
+                      )
+                    : null,
+                hintText: 'Что хочешь послушать?',
+                hintStyle: TextStyle(
+                  color: Colors.white.withValues(alpha: 0.45),
+                  fontSize: 14.5,
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: 12),
+          SizedBox(
+            height: 32,
+            child: ListView.separated(
+              scrollDirection: Axis.horizontal,
+              itemCount: services.length,
+              separatorBuilder: (_, __) => const SizedBox(width: 8),
+              itemBuilder: (context, index) {
+                final s = services[index];
+                final active = service == s.$2;
+                return InkWell(
+                  borderRadius: BorderRadius.circular(999),
+                  onTap: () => onServiceChanged(s.$2),
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 150),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: active
+                          ? Colors.white
+                          : Colors.white.withValues(alpha: 0.08),
+                      borderRadius: BorderRadius.circular(999),
+                      border: Border.all(
+                        color: active
+                            ? Colors.white
+                            : Colors.white.withValues(alpha: 0.08),
+                      ),
+                    ),
+                    child: Text(
+                      s.$1,
+                      style: TextStyle(
+                        fontSize: 12.5,
+                        fontWeight: active ? FontWeight.bold : FontWeight.w500,
+                        color: active ? Colors.black : Colors.white,
+                      ),
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _SearchDiscoveryState extends StatelessWidget {
   const _SearchDiscoveryState({
     required this.recentQueries,
@@ -612,6 +811,117 @@ class _SearchDiscoveryState extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isMobile = MediaQuery.sizeOf(context).width < 720;
+
+    if (isMobile) {
+      return ListView(
+        padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+        children: [
+          if (recentQueries.isNotEmpty) ...[
+            const Text(
+              'Недавние поиски',
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w700,
+                color: Colors.white,
+              ),
+            ),
+            const SizedBox(height: 10),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: recentQueries.map((query) {
+                return ActionChip(
+                  avatar: const Icon(Icons.history_rounded,
+                      size: 16, color: Colors.white70),
+                  label: Text(query,
+                      style: const TextStyle(
+                          fontSize: 12.5, color: Colors.white)),
+                  backgroundColor: Colors.white.withValues(alpha: 0.08),
+                  side: BorderSide(
+                      color: Colors.white.withValues(alpha: 0.08)),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(20)),
+                  onPressed: () => onSelect(query),
+                );
+              }).toList(growable: false),
+            ),
+            const SizedBox(height: 20),
+          ],
+          const Text(
+            'Все жанры и категории',
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.w800,
+              color: Colors.white,
+              letterSpacing: -0.3,
+            ),
+          ),
+          const SizedBox(height: 12),
+          GridView.builder(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            itemCount: _kSpotifyGenres.length,
+            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: 2,
+              mainAxisSpacing: 10,
+              crossAxisSpacing: 10,
+              childAspectRatio: 1.85,
+            ),
+            itemBuilder: (context, index) {
+              final g = _kSpotifyGenres[index];
+              return InkWell(
+                borderRadius: BorderRadius.circular(10),
+                onTap: () => onSelect(g.title),
+                child: Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(10),
+                    gradient: LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: g.colors,
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: g.colors.first.withValues(alpha: 0.35),
+                        blurRadius: 8,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
+                  ),
+                  child: Stack(
+                    children: [
+                      Text(
+                        g.title,
+                        style: const TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w800,
+                          color: Colors.white,
+                        ),
+                      ),
+                      Positioned(
+                        right: -4,
+                        bottom: -4,
+                        child: Transform.rotate(
+                          angle: 0.25,
+                          child: Icon(
+                            g.icon,
+                            size: 38,
+                            color: Colors.white.withValues(alpha: 0.45),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            },
+          ),
+        ],
+      );
+    }
+
     final recent = recentQueries.isEmpty ? const ['Daft Punk'] : recentQueries;
     return ListView(
       padding: const EdgeInsets.fromLTRB(22, 0, 22, 22),
