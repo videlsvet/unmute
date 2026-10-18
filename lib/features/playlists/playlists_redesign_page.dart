@@ -11,7 +11,6 @@ import '../../widgets/app_header.dart';
 import '../../widgets/empty_state.dart';
 import '../../widgets/error_state.dart';
 import '../../widgets/glass_panel.dart';
-import '../../widgets/service_chip.dart';
 import '../../widgets/ui_kit.dart';
 import 'playlist_details_redesign_page.dart';
 

@@ -107,6 +107,41 @@ class PlayerController extends ChangeNotifier {
     await _playTrackInternal(_queue[nextIndex]);
   }
 
+  int get remainingTracksCount {
+    if (_currentIndex < 0 || _queue.isEmpty) return 0;
+    return _queue.length - _currentIndex - 1;
+  }
+
+  void appendTracks(List<Track> tracks) {
+    if (tracks.isEmpty) return;
+    final updated = List<Track>.from(_queue)..addAll(tracks);
+    _queue = List<Track>.unmodifiable(updated);
+    notifyListeners();
+  }
+
+  Future<void> removeTrackAndSkip(String trackId) async {
+    final index = _queue.indexWhere((t) => t.id == trackId);
+    if (index == -1) return;
+
+    final wasCurrent = index == _currentIndex;
+    final updated = List<Track>.from(_queue)..removeAt(index);
+    _queue = List<Track>.unmodifiable(updated);
+
+    if (wasCurrent) {
+      if (_currentIndex < _queue.length) {
+        await _playTrackInternal(_queue[_currentIndex]);
+      } else if (_queue.isNotEmpty) {
+        _currentIndex = 0;
+        await _playTrackInternal(_queue[0]);
+      } else {
+        await stop();
+      }
+    } else if (index < _currentIndex) {
+      _currentIndex--;
+    }
+    notifyListeners();
+  }
+
   Future<void> playAt(int index) async {
     if (index < 0 || index >= _queue.length) return;
     _currentIndex = index;

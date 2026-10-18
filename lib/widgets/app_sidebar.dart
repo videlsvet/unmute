@@ -90,8 +90,8 @@ class AppSidebar extends StatelessWidget {
                     onTap: () => onChanged(AppSection.albums),
                   ),
                   _NavItem(
-                    title: 'Радио',
-                    icon: Icons.radio_rounded,
+                    title: 'Моя Волна',
+                    icon: Icons.waves_rounded,
                     selected: current == AppSection.radio,
                     collapsed: collapsed,
                     onTap: () => onChanged(AppSection.radio),

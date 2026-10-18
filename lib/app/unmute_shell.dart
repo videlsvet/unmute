@@ -8,6 +8,7 @@ import '../core/services/auth_service.dart';
 import '../core/services/music_service.dart';
 import '../core/services/playlist_service.dart';
 import '../core/services/profile_service.dart';
+import '../core/services/wave_service.dart';
 import '../features/album/album_page.dart';
 import '../features/artist/artist_page.dart';
 import '../features/favorites/favorites_redesign_page.dart';
@@ -15,6 +16,8 @@ import '../features/playlists/playlists_redesign_page.dart';
 import '../features/profile/auth_redesign_page.dart';
 import '../features/profile/profile_page.dart';
 import '../features/search/search_redesign_page.dart';
+import '../features/wave/wave_page.dart';
+import '../theme/app_theme.dart';
 import '../widgets/app_sidebar.dart';
 import '../widgets/player_bar.dart';
 import '../widgets/premium_components.dart';
@@ -82,7 +85,11 @@ class _UnmuteShellState extends State<UnmuteShell> {
   final PlaylistService _playlistService = PlaylistService();
   final ProfileService _profileService = ProfileService();
   final FocusNode _focusNode = FocusNode(debugLabel: 'unmute-shell');
+
   late final PlayerController _playerController;
+  late final WaveProfileStore _waveStore;
+  late final WaveGenerator _waveGenerator;
+  late final WaveController _waveController;
 
   AppSection _section = AppSection.home;
   String? _token;
@@ -94,8 +101,24 @@ class _UnmuteShellState extends State<UnmuteShell> {
     super.initState();
     _playerController = PlayerController();
     _playerController.prepareTrackForPlayback = _prepareTrackForPlayback;
+
+    _waveStore = WaveProfileStore();
+    _waveGenerator = WaveGenerator(
+      musicService: _musicService,
+      store: _waveStore,
+    );
+    _waveController = WaveController(
+      generator: _waveGenerator,
+      store: _waveStore,
+    );
+
+    _playerController.addListener(_onPlayerStateChanged);
     _token = widget.initialToken;
     _favorites = List<Track>.unmodifiable(widget.initialFavorites);
+  }
+
+  void _onPlayerStateChanged() {
+    _waveController.onPlayerTick(_playerController);
   }
 
   Future<Track> _prepareTrackForPlayback(Track track) async {
@@ -246,10 +269,12 @@ class _UnmuteShellState extends State<UnmuteShell> {
           authService: _authService,
           playlistService: _playlistService,
           playerController: _playerController,
+          waveController: _waveController,
           initialFavorites: _favorites,
           onOpenSearch: () => _setSection(AppSection.search),
           onOpenFavorites: () => _setSection(AppSection.favorites),
           onOpenPlaylists: () => _setSection(AppSection.playlists),
+          onOpenWave: () => _setSection(AppSection.radio),
         );
       case AppSection.search:
         return SearchRedesignPage(
@@ -305,12 +330,14 @@ class _UnmuteShellState extends State<UnmuteShell> {
           action: () => _setSection(AppSection.search),
         );
       case AppSection.radio:
-        return _ComingSoonPage(
-          title: 'Радио',
-          subtitle:
-              'Быстрые станции и mood radio появятся как отдельный сценарий прослушивания.',
-          icon: Icons.radio_rounded,
-          action: () => _setSection(AppSection.search),
+        return WavePage(
+          waveController: _waveController,
+          playerController: _playerController,
+          authService: _authService,
+          isFavoriteTrack: _isFavoriteTrack,
+          onToggleFavorite: _toggleFavoriteTrack,
+          onOpenArtist: _openArtist,
+          onOpenAlbum: _openAlbumFromTrack,
         );
       case AppSection.settings:
         return _ComingSoonPage(
@@ -356,7 +383,9 @@ class _UnmuteShellState extends State<UnmuteShell> {
   @override
   void dispose() {
     _focusNode.dispose();
+    _playerController.removeListener(_onPlayerStateChanged);
     _playerController.dispose();
+    _waveController.dispose();
     super.dispose();
   }
 
@@ -366,6 +395,7 @@ class _UnmuteShellState extends State<UnmuteShell> {
       animation: _playerController,
       builder: (context, _) {
         final width = MediaQuery.sizeOf(context).width;
+        final isMobile = width < 720;
         final collapsedSidebar = width < 1120;
         final showRightPanel = width >= 1280;
 
@@ -418,19 +448,20 @@ class _UnmuteShellState extends State<UnmuteShell> {
                           child: Row(
                             crossAxisAlignment: CrossAxisAlignment.stretch,
                             children: [
-                              AppSidebar(
-                                current: _section,
-                                onChanged: _setSection,
-                                isAuthorized: _token != null,
-                                collapsed: collapsedSidebar,
-                              ),
+                              if (!isMobile)
+                                AppSidebar(
+                                  current: _section,
+                                  onChanged: _setSection,
+                                  isAuthorized: _token != null,
+                                  collapsed: collapsedSidebar,
+                                ),
                               Expanded(
                                 child: Padding(
                                   padding: EdgeInsets.fromLTRB(
-                                    16,
-                                    16,
-                                    showRightPanel ? 14 : 16,
-                                    10,
+                                    isMobile ? 10 : 16,
+                                    isMobile ? 10 : 16,
+                                    showRightPanel ? 14 : (isMobile ? 10 : 16),
+                                    isMobile ? 4 : 10,
                                   ),
                                   child: AnimatedSwitcher(
                                     duration: const Duration(milliseconds: 260),
@@ -452,12 +483,13 @@ class _UnmuteShellState extends State<UnmuteShell> {
                                   padding:
                                       const EdgeInsets.fromLTRB(0, 16, 16, 10),
                                   child: RightNowPlayingPanel(
-                                      controller: _playerController,
-                                      isFavorite: _isFavoriteTrack(
-                                        _playerController.currentTrack,
-                                      ),
-                                      onToggleFavorite: (track) =>
-                                          _toggleFavoriteTrack(track)),
+                                    controller: _playerController,
+                                    isFavorite: _isFavoriteTrack(
+                                      _playerController.currentTrack,
+                                    ),
+                                    onToggleFavorite: (track) =>
+                                        _toggleFavoriteTrack(track),
+                                  ),
                                 ),
                             ],
                           ),
@@ -468,6 +500,11 @@ class _UnmuteShellState extends State<UnmuteShell> {
                           onToggleFavorite: (track) =>
                               _toggleFavoriteTrack(track),
                         ),
+                        if (isMobile)
+                          _MobileBottomNavBar(
+                            current: _section,
+                            onChanged: _setSection,
+                          ),
                       ],
                     ),
                   ),
@@ -477,6 +514,75 @@ class _UnmuteShellState extends State<UnmuteShell> {
           ),
         );
       },
+    );
+  }
+}
+
+class _MobileBottomNavBar extends StatelessWidget {
+  const _MobileBottomNavBar({
+    required this.current,
+    required this.onChanged,
+  });
+
+  final AppSection current;
+  final ValueChanged<AppSection> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final items = [
+      (AppSection.home, 'Главная', Icons.home_rounded),
+      (AppSection.radio, 'Волна', Icons.waves_rounded),
+      (AppSection.search, 'Поиск', Icons.search_rounded),
+      (AppSection.favorites, 'Избранное', Icons.favorite_rounded),
+      (AppSection.profile, 'Профиль', Icons.person_rounded),
+    ];
+
+    return Container(
+      decoration: BoxDecoration(
+        color: AppTheme.surface.withValues(alpha: 0.96),
+        border: Border(
+          top: BorderSide(
+            color: Colors.white.withValues(alpha: 0.08),
+            width: 0.8,
+          ),
+        ),
+      ),
+      padding: const EdgeInsets.only(top: 4, bottom: 2),
+      child: SafeArea(
+        top: false,
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceAround,
+          children: items.map((item) {
+            final active = current == item.$1;
+            return InkWell(
+              borderRadius: BorderRadius.circular(14),
+              onTap: () => onChanged(item.$1),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      item.$3,
+                      size: 22,
+                      color: active ? AppTheme.accent2 : AppTheme.textMuted,
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      item.$2,
+                      style: TextStyle(
+                        fontSize: 10.5,
+                        fontWeight: active ? FontWeight.bold : FontWeight.w500,
+                        color: active ? Colors.white : AppTheme.textMuted,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          }).toList(growable: false),
+        ),
+      ),
     );
   }
 }

@@ -147,30 +147,61 @@ class AlbumResult {
 }
 
 class MusicService {
+  Future<dynamic> _fetchWithFallback(Map<String, String> params) async {
+    final endpoints = [
+      AppConfig.apiGatewayUrl,
+      AppConfig.searchBaseUrl,
+    ];
+
+    Object? lastError;
+    for (final base in endpoints) {
+      try {
+        final uri = Uri.parse(base).replace(queryParameters: params);
+        final response = await http.get(uri).timeout(const Duration(seconds: 12));
+        if (response.statusCode == 200) {
+          return jsonDecode(response.body);
+        }
+      } catch (e) {
+        lastError = e;
+      }
+    }
+    throw Exception(lastError?.toString() ?? 'Ошибка обращения к музыкальному сервису');
+  }
+
   Future<SearchPageResult> search({
     required String service,
     required String query,
     int limit = 40,
     int offset = 0,
   }) async {
-    final uri = Uri.parse(AppConfig.searchBaseUrl).replace(
-      queryParameters: {
-        'type': 'search_v2',
-        'service': service,
-        'q': query,
-        'limit': '$limit',
-        'offset': '$offset',
-      },
-    );
+    final params = {
+      'type': 'search_v2',
+      'service': service,
+      'q': query,
+      'limit': '$limit',
+      'offset': '$offset',
+    };
 
-    final response = await http.get(uri);
-    final data = jsonDecode(response.body);
-
-    if (response.statusCode != 200) {
-      throw Exception((data['error'] ?? 'Search error').toString());
+    final data = await _fetchWithFallback(params);
+    if (data is Map) {
+      if (data.containsKey('error') && data['error'] != null) {
+        throw Exception(data['error'].toString());
+      }
+      return SearchPageResult.fromJson(Map<String, dynamic>.from(data));
+    } else if (data is List) {
+      final tracks = data
+          .whereType<Map>()
+          .map((e) => Track.fromJson(Map<String, dynamic>.from(e)))
+          .where((t) => (t.error ?? '').isEmpty)
+          .toList();
+      return SearchPageResult(
+        tracks: tracks,
+        artists: const [],
+        hasMore: false,
+        nextOffset: tracks.length,
+      );
     }
-
-    return SearchPageResult.fromJson(Map<String, dynamic>.from(data));
+    throw Exception('Некорректный формат ответа поиска');
   }
 
   Future<ArtistResult> loadArtist({
@@ -190,15 +221,14 @@ class MusicService {
       params['artist_name'] = artistName!.trim();
     }
 
-    final uri = Uri.parse(AppConfig.searchBaseUrl).replace(queryParameters: params);
-    final response = await http.get(uri);
-    final data = jsonDecode(response.body);
-
-    if (response.statusCode != 200) {
-      throw Exception((data['error'] ?? 'Artist error').toString());
+    final data = await _fetchWithFallback(params);
+    if (data is Map) {
+      if (data.containsKey('error') && data['error'] != null) {
+        throw Exception(data['error'].toString());
+      }
+      return ArtistResult.fromJson(Map<String, dynamic>.from(data));
     }
-
-    return ArtistResult.fromJson(Map<String, dynamic>.from(data));
+    throw Exception('Некорректный формат ответа артиста');
   }
 
   Future<AlbumResult> loadAlbum({
@@ -220,14 +250,13 @@ class MusicService {
       params['access_key'] = accessKey!.trim();
     }
 
-    final uri = Uri.parse(AppConfig.searchBaseUrl).replace(queryParameters: params);
-    final response = await http.get(uri);
-    final data = jsonDecode(response.body);
-
-    if (response.statusCode != 200) {
-      throw Exception((data['error'] ?? 'Album error').toString());
+    final data = await _fetchWithFallback(params);
+    if (data is Map) {
+      if (data.containsKey('error') && data['error'] != null) {
+        throw Exception(data['error'].toString());
+      }
+      return AlbumResult.fromJson(Map<String, dynamic>.from(data));
     }
-
-    return AlbumResult.fromJson(Map<String, dynamic>.from(data));
+    throw Exception('Некорректный формат ответа альбома');
   }
 }
