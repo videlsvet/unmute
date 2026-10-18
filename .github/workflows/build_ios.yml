@@ -26,19 +26,19 @@ jobs:
         run: |
           flutter config --no-enable-swift-package-manager
           flutter pub get
-          flutter build ios --config-only --release
+          flutter build ios --config-only --no-codesign
           cd ios
           pod install
           cd ..
 
-      - name: Build iOS Archive (xcodebuild unsigned)
+      - name: Build iOS App (xcodebuild unsigned)
         run: |
-          xcodebuild archive \
+          xcodebuild build \
             -workspace ios/Runner.xcworkspace \
             -scheme Runner \
             -configuration Release \
             -destination 'generic/platform=iOS' \
-            -archivePath build/ios/Runner.xcarchive \
+            -derivedDataPath build/ios/DerivedData \
             CODE_SIGNING_ALLOWED=NO \
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGN_IDENTITY=""
@@ -46,7 +46,9 @@ jobs:
       - name: Package IPA for Sideloading
         run: |
           mkdir -p Payload
-          cp -r build/ios/Runner.xcarchive/Products/Applications/Runner.app Payload/
+          APP_PATH=$(find build/ios/DerivedData/Build/Products -name "Runner.app" | head -n 1)
+          echo "Found app at: $APP_PATH"
+          cp -r "$APP_PATH" Payload/
           zip -r -y Unmute.ipa Payload
 
       - name: Upload IPA
