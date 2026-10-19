@@ -106,9 +106,12 @@ bool _containsVersionWords(String x) {
 // ══════════════════════════════════════════════════════════════
 
 enum WaveMode {
-  coldStart,
-  exploration,
-  flow,
+  flow,        // Моя Волна (персональный поток)
+  exploration, // Открытия
+  favorites,   // Любимое
+  energy,      // Драйв
+  calm,        // Спокойное
+  coldStart,   // Популярное
 }
 
 // ══════════════════════════════════════════════════════════════
@@ -326,17 +329,19 @@ class WaveGenerator {
   WaveGenerator({
     required this.musicService,
     required this.store,
+    this.authService,
   });
 
   final MusicService musicService;
   final WaveProfileStore store;
+  final AuthService? authService;
   final Random _random = Random();
 
   Future<List<Track>> generate({
     String? seedArtistRaw,
     String? seedTitleRaw,
     int amount = 30,
-    WaveMode mode = WaveMode.exploration,
+    WaveMode mode = WaveMode.flow,
   }) async {
     final seedArtist = canonicalArtist(seedArtistRaw);
     final seedTitle = canonicalTitle(seedTitleRaw);
@@ -345,8 +350,45 @@ class WaveGenerator {
     final topGenres = await store.topGenres(5);
     final historySet = await store.historyKeysLast(200);
 
-    // COLD START — if no history and no seed
-    if (topArtists.isEmpty && seedArtist.isEmpty) {
+    // 1. Fetch user's saved favorites if available
+    List<Track> userFavorites = const [];
+    if (authService != null) {
+      try {
+        final token = await authService!.getSavedToken();
+        if (token != null && token.isNotEmpty) {
+          userFavorites = await authService!.listFavorites(token);
+        }
+      } catch (_) {}
+    }
+
+    // 2. Mode: FAVORITES - play directly from user's favorite library
+    if (mode == WaveMode.favorites && userFavorites.isNotEmpty) {
+      final validFavs = <Track>[];
+      for (final t in userFavorites) {
+        if (!t.hasPlayableUrl) continue;
+        final k = store.makeTrackKey(t.artist, t.title);
+        if (await store.isDisliked(k)) continue;
+        validFavs.add(t);
+      }
+      if (validFavs.isNotEmpty) {
+        validFavs.shuffle(_random);
+        return validFavs.take(amount).toList();
+      }
+    }
+
+    // Extract favorite artists to seed personalization if history is empty
+    final effectiveTopArtists = <String>[...topArtists];
+    if (effectiveTopArtists.isEmpty && userFavorites.isNotEmpty) {
+      for (final t in userFavorites) {
+        final a = canonicalArtist(t.artist);
+        if (a.isNotEmpty && !effectiveTopArtists.contains(a)) {
+          effectiveTopArtists.add(a);
+        }
+      }
+    }
+
+    // COLD START — if no history, no favorites, and no seed
+    if (effectiveTopArtists.isEmpty && seedArtist.isEmpty) {
       return generateColdStart(amount);
     }
 
@@ -357,7 +399,7 @@ class WaveGenerator {
       if (seedTitle.isNotEmpty) queries.add('$seedArtist $seedTitle');
     }
 
-    for (final a in topArtists.take(5)) {
+    for (final a in effectiveTopArtists.take(5)) {
       if (a.isNotEmpty && a != seedArtist) queries.add(a);
     }
 
@@ -370,16 +412,50 @@ class WaveGenerator {
       if (strong != null) queries.add(strong);
     }
 
-    if (mode == WaveMode.exploration) {
-      const explorationSeeds = [
-        'new music',
-        'indie',
-        'electronic',
-        'chill',
-        'lo-fi',
-        'pop hits'
-      ];
-      queries.add(explorationSeeds[_random.nextInt(explorationSeeds.length)]);
+    // Mood-specific query injection
+    switch (mode) {
+      case WaveMode.exploration:
+        const explorationSeeds = [
+          'новые треки',
+          'свежая музыка',
+          'инди музыка',
+          'открытия музыка',
+          'indie new',
+        ];
+        queries.add(explorationSeeds[_random.nextInt(explorationSeeds.length)]);
+        break;
+      case WaveMode.energy:
+        const energySeeds = [
+          'хиты драйв',
+          'танцевальные хиты',
+          'клубная музыка',
+          'энергичные песни',
+          'рок драйв',
+        ];
+        queries.add(energySeeds[_random.nextInt(energySeeds.length)]);
+        break;
+      case WaveMode.calm:
+        const calmSeeds = [
+          'спокойная музыка',
+          'chillout lo-fi',
+          'акустика релакс',
+          'вечерний чилл',
+          'расслабляющая музыка',
+        ];
+        queries.add(calmSeeds[_random.nextInt(calmSeeds.length)]);
+        break;
+      case WaveMode.coldStart:
+        const popularSeeds = [
+          'топ чарт',
+          'главные хиты',
+          'популярные песни',
+          'лучшие треки',
+        ];
+        queries.add(popularSeeds[_random.nextInt(popularSeeds.length)]);
+        break;
+      case WaveMode.flow:
+      case WaveMode.favorites:
+        break;
     }
 
     final distinctQueries = queries
@@ -391,15 +467,17 @@ class WaveGenerator {
 
     if (distinctQueries.isEmpty) return generateColdStart(amount);
 
-    // FETCH CANDIDATES ACROSS YANDEX & VK
+    // FETCH CANDIDATES (Primary Yandex Music for high stream reliability)
     final candidates = <Track>[];
     for (final q in distinctQueries) {
       candidates.addAll(await _safeSearch(q, 'yandex'));
-      candidates.addAll(await _safeSearch(q, 'vkmusic'));
+      if (candidates.length < 15) {
+        candidates.addAll(await _safeSearch(q, 'vkmusic'));
+      }
     }
 
     // CO-ARTISTS
-    final coArtists = _extractCoArtists(candidates, seedArtist, topArtists.toSet());
+    final coArtists = _extractCoArtists(candidates, seedArtist, effectiveTopArtists.toSet());
     for (final a in coArtists.take(3)) {
       candidates.addAll(await _safeSearch(a, 'yandex'));
     }
@@ -424,7 +502,7 @@ class WaveGenerator {
     if (filtered.isEmpty) return generateColdStart(amount);
 
     // SCORE CANDIDATES
-    final topSet = topArtists.toSet();
+    final topSet = effectiveTopArtists.toSet();
     final scored = <MapEntry<Track, double>>[];
     for (final track in filtered) {
       final score = await _scoreTrack(track, seedArtist, topSet, seedTitle);
@@ -446,8 +524,11 @@ class WaveGenerator {
 
     final discoveryRatio = switch (mode) {
       WaveMode.coldStart => 0.5,
-      WaveMode.exploration => 0.3,
-      WaveMode.flow => 0.2,
+      WaveMode.exploration => 0.6,
+      WaveMode.flow => 0.3,
+      WaveMode.favorites => 0.05,
+      WaveMode.energy => 0.25,
+      WaveMode.calm => 0.25,
     };
 
     final targetDiscoveries =
@@ -483,17 +564,16 @@ class WaveGenerator {
 
   Future<List<Track>> generateColdStart(int amount) async {
     const popularQueries = [
-      'top hits 2025',
-      'popular hits',
-      'trending songs',
-      'indie electronic',
-      'chillout beats',
+      'топ чарт 2025',
+      'популярные треки',
+      'главные хиты',
+      'новинки недели',
+      'лучшая музыка',
     ];
 
     final candidates = <Track>[];
     for (final q in popularQueries.take(3)) {
       candidates.addAll(await _safeSearch(q, 'yandex'));
-      candidates.addAll(await _safeSearch(q, 'vkmusic'));
     }
 
     final valid = candidates.where((t) => t.hasPlayableUrl).toList();
@@ -596,15 +676,17 @@ class WaveController extends ChangeNotifier {
   WaveController({
     required this.generator,
     required this.store,
+    this.authService,
   });
 
   final WaveGenerator generator;
   final WaveProfileStore store;
+  final AuthService? authService;
 
   bool isRunning = false;
   bool isLoading = false;
   String statusMessage = 'Моя Волна готова';
-  WaveMode mode = WaveMode.exploration;
+  WaveMode mode = WaveMode.flow;
   Track? lastPlayedTrack;
   DateTime? _currentTrackStartTime;
 
@@ -658,8 +740,8 @@ class WaveController extends ChangeNotifier {
       _handleTrackChanged(lastPlayedTrack, current);
     }
 
-    // Auto-load next batch if queue remaining count <= 5
-    if (!isLoading && playerController.remainingTracksCount <= 5) {
+    // Auto-load next batch if queue remaining count <= 4
+    if (!isLoading && playerController.remainingTracksCount <= 4) {
       loadMore(playerController);
     }
   }
@@ -679,7 +761,7 @@ class WaveController extends ChangeNotifier {
         seedArtistRaw: lastTrack?.artist,
         seedTitleRaw: lastTrack?.title,
         amount: 20,
-        mode: WaveMode.flow,
+        mode: mode,
       );
 
       if (moreTracks.isNotEmpty) {
@@ -726,7 +808,7 @@ class WaveController extends ChangeNotifier {
     await playerController.removeTrackAndSkip(track.id);
 
     // Trigger load more if queue dropped low
-    if (playerController.remainingTracksCount <= 5) {
+    if (playerController.remainingTracksCount <= 4) {
       await loadMore(playerController);
     }
   }
@@ -750,8 +832,34 @@ class WaveController extends ChangeNotifier {
     notifyListeners();
   }
 
-  void setMode(WaveMode newMode) {
+  Future<void> setMode(WaveMode newMode, {PlayerController? playerController}) async {
+    if (mode == newMode && isRunning) return;
     mode = newMode;
     notifyListeners();
+
+    if (isRunning && playerController != null) {
+      isLoading = true;
+      statusMessage = 'Переключаем волну...';
+      notifyListeners();
+
+      try {
+        final current = playerController.currentTrack;
+        final tracks = await generator.generate(
+          seedArtistRaw: current?.artist,
+          seedTitleRaw: current?.title,
+          amount: 25,
+          mode: mode,
+        );
+
+        if (tracks.isNotEmpty) {
+          await playerController.playTracks(tracks, startIndex: 0);
+          _onTrackStarted(playerController.currentTrack);
+          statusMessage = 'Волна активна';
+        }
+      } catch (_) {}
+
+      isLoading = false;
+      notifyListeners();
+    }
   }
 }

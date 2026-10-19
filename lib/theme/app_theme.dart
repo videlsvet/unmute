@@ -13,8 +13,10 @@ class AppTheme {
   static const Color stroke = Color(0xFF282828);
   static const Color strokeSoft = Color(0xFF3A3A3A);
   static const Color accent = Color(0xFF1ED760);
-  static const Color accent2 = Color(0xFF1ED760);
-  static const Color accentWarm = Color(0xFF1DB954);
+  static const Color accent2 = Color(0xFF00E5FF);
+  static const Color accentWarm = Color(0xFFFF4D6D);
+  static const Color accentAmber = Color(0xFFFFB703);
+  static const Color accentPurple = Color(0xFFA855F7);
   static const Color textPrimary = Color(0xFFFFFFFF);
   static const Color textSecondary = Color(0xFFB3B3B3);
   static const Color textMuted = Color(0xFF7A7A7A);

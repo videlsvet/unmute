@@ -5,6 +5,7 @@ import '../core/controllers/player_controller.dart';
 import '../core/models/artist.dart';
 import '../core/models/track.dart';
 import '../core/services/auth_service.dart';
+import '../core/services/ios_now_playing_service.dart';
 import '../core/services/music_service.dart';
 import '../core/services/playlist_service.dart';
 import '../core/services/profile_service.dart';
@@ -102,15 +103,18 @@ class _UnmuteShellState extends State<UnmuteShell> {
     super.initState();
     _playerController = PlayerController();
     _playerController.prepareTrackForPlayback = _prepareTrackForPlayback;
+    IosNowPlayingService.initialize(_playerController);
 
     _waveStore = WaveProfileStore();
     _waveGenerator = WaveGenerator(
       musicService: _musicService,
       store: _waveStore,
+      authService: _authService,
     );
     _waveController = WaveController(
       generator: _waveGenerator,
       store: _waveStore,
+      authService: _authService,
     );
 
     _playerController.addListener(_onPlayerStateChanged);

@@ -62,16 +62,21 @@ class BottomPlayerBar extends StatelessWidget {
     void openFullscreen() {
       Navigator.of(context).push(
         PageRouteBuilder<void>(
-          opaque: true,
+          opaque: false,
           fullscreenDialog: true,
-          pageBuilder: (_, __, ___) =>
-              _FullscreenPlayer(
-                controller: controller,
-                isFavoriteTrack: isFavoriteTrack,
-                onToggleFavorite: onToggleFavorite,
-              ),
+          pageBuilder: (_, __, ___) => _FullscreenPlayer(
+            controller: controller,
+            isFavoriteTrack: isFavoriteTrack,
+            onToggleFavorite: onToggleFavorite,
+          ),
           transitionsBuilder: (_, animation, __, child) {
-            return FadeTransition(opacity: animation, child: child);
+            return SlideTransition(
+              position: Tween<Offset>(
+                begin: const Offset(0, 1),
+                end: Offset.zero,
+              ).chain(CurveTween(curve: Curves.easeOutCubic)).animate(animation),
+              child: child,
+            );
           },
         ),
       );
@@ -593,6 +598,7 @@ class _FullscreenPlayer extends StatefulWidget {
 
 class _FullscreenPlayerState extends State<_FullscreenPlayer> {
   bool _showLyrics = false;
+  double _dragOffsetY = 0.0;
 
   String _fmt(Duration d) {
     final total = d.inSeconds;
@@ -917,13 +923,51 @@ class _FullscreenPlayerState extends State<_FullscreenPlayer> {
               child: LayoutBuilder(
                 builder: (context, constraints) {
                   if (constraints.maxWidth < 650) {
-                    return _buildSpotifyMobileFullscreen(
-                      context,
-                      controller,
-                      track,
-                      totalMs,
-                      posMs,
-                      constraints,
+                    return GestureDetector(
+                      behavior: HitTestBehavior.translucent,
+                      onVerticalDragUpdate: (details) {
+                        if (details.primaryDelta != null && (details.primaryDelta! > 0 || _dragOffsetY > 0)) {
+                          setState(() {
+                            _dragOffsetY = (_dragOffsetY + details.primaryDelta!).clamp(0.0, 500.0);
+                          });
+                        }
+                      },
+                      onVerticalDragEnd: (details) {
+                        if (_dragOffsetY > 110 || (details.primaryVelocity != null && details.primaryVelocity! > 550)) {
+                          Navigator.of(context).pop();
+                        } else {
+                          setState(() {
+                            _dragOffsetY = 0.0;
+                          });
+                        }
+                      },
+                      onHorizontalDragEnd: (details) {
+                        if (details.primaryVelocity != null) {
+                          if (details.primaryVelocity! < -220) {
+                            if (controller.canPlayNext) {
+                              controller.playNext();
+                            }
+                          } else if (details.primaryVelocity! > 220) {
+                            if (controller.canPlayPrevious) {
+                              controller.playPrevious();
+                            }
+                          }
+                        }
+                      },
+                      child: Transform.translate(
+                        offset: Offset(0, _dragOffsetY),
+                        child: Opacity(
+                          opacity: (1.0 - (_dragOffsetY / 400)).clamp(0.0, 1.0),
+                          child: _buildSpotifyMobileFullscreen(
+                            context,
+                            controller,
+                            track,
+                            totalMs,
+                            posMs,
+                            constraints,
+                          ),
+                        ),
+                      ),
                     );
                   }
 

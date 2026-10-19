@@ -9,6 +9,7 @@ import '../../theme/app_theme.dart';
 import '../../widgets/add_to_playlist_dialog.dart';
 import '../../widgets/premium_components.dart';
 import '../../widgets/service_chip.dart';
+import '../../widgets/ui_kit.dart';
 
 enum _FavoritesSort { recent, title, artist }
 
@@ -457,9 +458,187 @@ class _FavoritesRedesignPageState extends State<FavoritesRedesignPage> {
 
   Widget _buildList(List<Track> visibleTracks) {
     final isMobile = MediaQuery.sizeOf(context).width < 720;
+    if (isMobile) {
+      return ListView.builder(
+        padding: const EdgeInsets.fromLTRB(16, 0, 16, 32),
+        itemCount: visibleTracks.length,
+        itemBuilder: (context, index) {
+          final track = visibleTracks[index];
+          final isCurrent = widget.playerController.currentTrack?.id == track.id;
+
+          return InkWell(
+            borderRadius: BorderRadius.circular(10),
+            onTap: () => _playTrack(track),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 7, horizontal: 4),
+              child: Row(
+                children: [
+                  UnmuteArtwork(
+                    imageUrl: track.image,
+                    size: 48,
+                    radius: 8,
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          track.title,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontSize: 15,
+                            fontWeight: isCurrent ? FontWeight.w700 : FontWeight.w600,
+                            color: isCurrent ? AppTheme.accent : Colors.white,
+                          ),
+                        ),
+                        const SizedBox(height: 3),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                track.artist.isEmpty ? 'Unknown artist' : track.artist,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                  fontSize: 13,
+                                  color: AppTheme.textSecondary,
+                                ),
+                              ),
+                            ),
+                            if (track.source.isNotEmpty) ...[
+                              const SizedBox(width: 6),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+                                decoration: BoxDecoration(
+                                  borderRadius: BorderRadius.circular(4),
+                                  color: Colors.white.withValues(alpha: 0.08),
+                                ),
+                                child: Text(
+                                  track.source.toUpperCase(),
+                                  style: const TextStyle(
+                                    fontSize: 9,
+                                    fontWeight: FontWeight.w600,
+                                    color: AppTheme.textMuted,
+                                    letterSpacing: 0.5,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 4),
+                  IconButton(
+                    icon: const Icon(
+                      Icons.favorite_rounded,
+                      color: AppTheme.accentWarm,
+                      size: 22,
+                    ),
+                    tooltip: 'Удалить из избранного',
+                    onPressed: () => _removeTrack(track),
+                  ),
+                  PopupMenuButton<String>(
+                    icon: const Icon(
+                      Icons.more_vert_rounded,
+                      color: AppTheme.textSecondary,
+                      size: 20,
+                    ),
+                    color: const Color(0xFF1E2330),
+                    onSelected: (val) {
+                      switch (val) {
+                        case 'play':
+                          _playTrack(track);
+                          break;
+                        case 'playlist':
+                          _addToPlaylist(track);
+                          break;
+                        case 'artist':
+                          if (widget.onOpenArtist != null && track.artist.trim().isNotEmpty) {
+                            widget.onOpenArtist!(ArtistSummary(
+                              artistName: track.artist.trim(),
+                              source: track.source,
+                              artistId: track.artistId,
+                            ));
+                          }
+                          break;
+                        case 'album':
+                          _openAlbum(track);
+                          break;
+                        case 'remove':
+                          _removeTrack(track);
+                          break;
+                      }
+                    },
+                    itemBuilder: (_) => [
+                      const PopupMenuItem(
+                        value: 'play',
+                        child: Row(
+                          children: [
+                            Icon(Icons.play_arrow_rounded, size: 18),
+                            SizedBox(width: 10),
+                            Text('Слушать'),
+                          ],
+                        ),
+                      ),
+                      const PopupMenuItem(
+                        value: 'playlist',
+                        child: Row(
+                          children: [
+                            Icon(Icons.playlist_add_rounded, size: 18),
+                            SizedBox(width: 10),
+                            Text('В плейлист'),
+                          ],
+                        ),
+                      ),
+                      if (widget.onOpenArtist != null && track.artist.trim().isNotEmpty)
+                        const PopupMenuItem(
+                          value: 'artist',
+                          child: Row(
+                            children: [
+                              Icon(Icons.person_outline_rounded, size: 18),
+                              SizedBox(width: 10),
+                              Text('К артисту'),
+                            ],
+                          ),
+                        ),
+                      if ((track.albumId ?? '').trim().isNotEmpty)
+                        const PopupMenuItem(
+                          value: 'album',
+                          child: Row(
+                            children: [
+                              Icon(Icons.album_outlined, size: 18),
+                              SizedBox(width: 10),
+                              Text('К альбому'),
+                            ],
+                          ),
+                        ),
+                      const PopupMenuItem(
+                        value: 'remove',
+                        child: Row(
+                          children: [
+                            Icon(Icons.delete_outline_rounded, color: Colors.redAccent, size: 18),
+                            SizedBox(width: 10),
+                            Text('Удалить из избранного', style: TextStyle(color: Colors.redAccent)),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          );
+        },
+      );
+    }
+
     return ListView.separated(
-      padding: EdgeInsets.fromLTRB(
-          isMobile ? 16 : 22, 0, isMobile ? 16 : 22, 22),
+      padding: const EdgeInsets.fromLTRB(22, 0, 22, 22),
       itemCount: visibleTracks.length,
       separatorBuilder: (_, __) => const SizedBox(height: 8),
       itemBuilder: (context, index) {

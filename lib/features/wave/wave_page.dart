@@ -124,10 +124,10 @@ class _WavePageState extends State<WavePage> {
               controller: widget.waveController,
               isMobile: true,
               onModeChanged: (mode) {
-                widget.waveController.setMode(mode);
-                if (isWaveRunning) {
-                  widget.waveController.loadMore(widget.playerController);
-                }
+                widget.waveController.setMode(
+                  mode,
+                  playerController: widget.playerController,
+                );
               },
             ),
             const SizedBox(height: 16),
@@ -413,10 +413,10 @@ class _WavePageState extends State<WavePage> {
           _WaveHeader(
             controller: widget.waveController,
             onModeChanged: (mode) {
-              widget.waveController.setMode(mode);
-              if (isWaveRunning) {
-                widget.waveController.loadMore(widget.playerController);
-              }
+              widget.waveController.setMode(
+                mode,
+                playerController: widget.playerController,
+              );
             },
           ),
           const SizedBox(height: 20),
@@ -738,6 +738,13 @@ class _WaveHeader extends StatelessWidget {
               child: Row(
                 children: [
                   _ModeChip(
+                    label: 'Моя Волна',
+                    selected: controller.mode == WaveMode.flow,
+                    onTap: () => onModeChanged(WaveMode.flow),
+                    isMobile: true,
+                  ),
+                  const SizedBox(width: 8),
+                  _ModeChip(
                     label: 'Открытия',
                     selected: controller.mode == WaveMode.exploration,
                     onTap: () => onModeChanged(WaveMode.exploration),
@@ -745,9 +752,23 @@ class _WaveHeader extends StatelessWidget {
                   ),
                   const SizedBox(width: 8),
                   _ModeChip(
-                    label: 'В потоке',
-                    selected: controller.mode == WaveMode.flow,
-                    onTap: () => onModeChanged(WaveMode.flow),
+                    label: 'Любимое',
+                    selected: controller.mode == WaveMode.favorites,
+                    onTap: () => onModeChanged(WaveMode.favorites),
+                    isMobile: true,
+                  ),
+                  const SizedBox(width: 8),
+                  _ModeChip(
+                    label: 'Драйв',
+                    selected: controller.mode == WaveMode.energy,
+                    onTap: () => onModeChanged(WaveMode.energy),
+                    isMobile: true,
+                  ),
+                  const SizedBox(width: 8),
+                  _ModeChip(
+                    label: 'Спокойное',
+                    selected: controller.mode == WaveMode.calm,
+                    onTap: () => onModeChanged(WaveMode.calm),
                     isMobile: true,
                   ),
                   const SizedBox(width: 8),
@@ -819,26 +840,48 @@ class _WaveHeader extends StatelessWidget {
           ),
           const SizedBox(height: 12),
           // Mode pills
-          Row(
-            children: [
-              _ModeChip(
-                label: 'Открытия',
-                selected: controller.mode == WaveMode.exploration,
-                onTap: () => onModeChanged(WaveMode.exploration),
-              ),
-              const SizedBox(width: 8),
-              _ModeChip(
-                label: 'В потоке',
-                selected: controller.mode == WaveMode.flow,
-                onTap: () => onModeChanged(WaveMode.flow),
-              ),
-              const SizedBox(width: 8),
-              _ModeChip(
-                label: 'Популярное',
-                selected: controller.mode == WaveMode.coldStart,
-                onTap: () => onModeChanged(WaveMode.coldStart),
-              ),
-            ],
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            physics: const BouncingScrollPhysics(),
+            child: Row(
+              children: [
+                _ModeChip(
+                  label: 'Моя Волна',
+                  selected: controller.mode == WaveMode.flow,
+                  onTap: () => onModeChanged(WaveMode.flow),
+                ),
+                const SizedBox(width: 8),
+                _ModeChip(
+                  label: 'Открытия',
+                  selected: controller.mode == WaveMode.exploration,
+                  onTap: () => onModeChanged(WaveMode.exploration),
+                ),
+                const SizedBox(width: 8),
+                _ModeChip(
+                  label: 'Любимое',
+                  selected: controller.mode == WaveMode.favorites,
+                  onTap: () => onModeChanged(WaveMode.favorites),
+                ),
+                const SizedBox(width: 8),
+                _ModeChip(
+                  label: 'Драйв',
+                  selected: controller.mode == WaveMode.energy,
+                  onTap: () => onModeChanged(WaveMode.energy),
+                ),
+                const SizedBox(width: 8),
+                _ModeChip(
+                  label: 'Спокойное',
+                  selected: controller.mode == WaveMode.calm,
+                  onTap: () => onModeChanged(WaveMode.calm),
+                ),
+                const SizedBox(width: 8),
+                _ModeChip(
+                  label: 'Популярное',
+                  selected: controller.mode == WaveMode.coldStart,
+                  onTap: () => onModeChanged(WaveMode.coldStart),
+                ),
+              ],
+            ),
           ),
         ],
       ),
@@ -892,32 +935,30 @@ class _ModeChip extends StatelessWidget {
       );
     }
 
-    return Expanded(
-      child: InkWell(
-        borderRadius: BorderRadius.circular(AppTheme.radiusMd),
-        onTap: onTap,
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 180),
-          padding: const EdgeInsets.symmetric(vertical: 8),
-          alignment: Alignment.center,
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(AppTheme.radiusMd),
+    return InkWell(
+      borderRadius: BorderRadius.circular(AppTheme.radiusMd),
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 180),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(AppTheme.radiusMd),
+          color: selected
+              ? AppTheme.accent.withValues(alpha: 0.18)
+              : Colors.transparent,
+          border: Border.all(
             color: selected
-                ? AppTheme.accent.withValues(alpha: 0.18)
-                : Colors.transparent,
-            border: Border.all(
-              color: selected
-                  ? AppTheme.accent.withValues(alpha: 0.5)
-                  : AppTheme.strokeSoft,
-            ),
+                ? AppTheme.accent.withValues(alpha: 0.5)
+                : AppTheme.strokeSoft,
           ),
-          child: Text(
-            label,
-            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: selected ? Colors.white : AppTheme.textSecondary,
-                  fontWeight: selected ? FontWeight.bold : FontWeight.normal,
-                ),
-          ),
+        ),
+        child: Text(
+          label,
+          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                color: selected ? Colors.white : AppTheme.textSecondary,
+                fontWeight: selected ? FontWeight.bold : FontWeight.normal,
+              ),
         ),
       ),
     );
