@@ -116,6 +116,9 @@ class _UnmuteShellState extends State<UnmuteShell> {
       store: _waveStore,
       authService: _authService,
     );
+    _playerController.onNonWavePlaybackStarted = () {
+      _waveController.stopWave();
+    };
 
     _playerController.addListener(_onPlayerStateChanged);
     _token = widget.initialToken;

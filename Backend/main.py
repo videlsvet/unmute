@@ -1,11 +1,13 @@
 import base64
 import json
 import os
+import re
 import time
 import xml.etree.ElementTree as ET
 from collections import OrderedDict
 from dataclasses import dataclass
 from typing import Any, Dict, List, Optional, Tuple
+from urllib.parse import quote, urljoin
 
 import requests
 from requests.adapters import HTTPAdapter
@@ -177,25 +179,42 @@ def _stream_response(status: int, body: bytes, headers: Dict[str, str]) -> Dict[
         "body": base64.b64encode(body).decode("ascii"),
     }
 
-def _rewrite_m3u8_playlist(text: str) -> str:
+def _strict_quote_url(url: str) -> str:
+    # urllib keeps "~" unescaped by design, but CloudFront signatures use it
+    # heavily. Encoding it makes the proxied URL safer across players/gateways.
+    return quote(url, safe="").replace("~", "%7E")
+
+
+def _rewrite_uri_attributes(line: str, base_url: str) -> str:
+    def repl(match: "re.Match[str]") -> str:
+        uri = match.group(1)
+        absolute = urljoin(base_url, uri)
+        return f'URI="{make_stream_proxy_url(absolute)}"'
+
+    return re.sub(r'URI="([^"]+)"', repl, line)
+
+
+def _rewrite_m3u8_playlist(text: str, base_url: str) -> str:
     out = []
     for line in text.splitlines():
         line = line.strip()
 
         # переписываем EXT-X-MAP:URI="https://...."
-        if line.startswith("#EXT-X-MAP:") and 'URI="' in line:
-            prefix, rest = line.split('URI="', 1)
-            uri, suffix = rest.split('"', 1)
-            proxied = make_stream_proxy_url(uri)
-            out.append(f'{prefix}URI="{proxied}"{suffix}')
+        if not line:
+            out.append(line)
             continue
+
+        if line.startswith("#") and 'URI="' in line:
+            out.append(_rewrite_uri_attributes(line, base_url))
+            continue
+
+        if line.startswith("#"):
+            out.append(line)
+            continue
+
+        out.append(make_stream_proxy_url(urljoin(base_url, line)))
 
         # URL строка (сегмент)
-        if line.startswith("http://") or line.startswith("https://"):
-            out.append(make_stream_proxy_url(line))
-            continue
-
-        out.append(line)
     return "\n".join(out) + "\n"
 
 
@@ -272,7 +291,7 @@ def proxy_stream(url: str, event: Dict[str, Any]) -> Dict[str, Any]:
         ct = (r.headers.get("Content-Type") or "").lower()
         if ".m3u8" in url or "application/vnd.apple.mpegurl" in ct or "application/x-mpegurl" in ct:
             text = r.text
-            rewritten = _rewrite_m3u8_playlist(text)
+            rewritten = _rewrite_m3u8_playlist(text, url)
             return {
                 "statusCode": r.status_code,
                 "headers": _cors_headers_stream({
@@ -724,6 +743,39 @@ def yandex_artist_top_tracks(artist_id: str, fallback_name: Optional[str] = None
         return {"error": f"yandexmusic artist: {type(e).__name__}: {e}"}
 
 
+def yandex_similar_tracks(track_id: str) -> List[Dict[str, Any]]:
+    track_id = (track_id or "").strip()
+    if not track_id:
+        return []
+    cache_key = f"yandexmusic:similar:{track_id}"
+    cached = cache_get(cache_key)
+    if cached:
+        return cached
+
+    token = os.getenv("YANDEXMUSIC_TOKEN")
+    if not token:
+        return []
+
+    try:
+        data = _ym_request(
+            f"https://api.music.yandex.net/tracks/{track_id}/similar",
+            token=token,
+            use_proxy=False
+        )
+        tracks = data.get("result", {}).get("similarTracks", [])
+        results = []
+        for t in tracks:
+            item = _norm_yandexmusic(t)
+            if item.get("id"):
+                item["preview"] = _get_yandex_stream(item["id"], token)
+            results.append(item)
+        cache_set(cache_key, results, ttl=180)
+        return results
+    except Exception as e:
+        print("yandex_similar_tracks error:", e)
+        return []
+
+
 # ======================================================================================
 # ===== Spotify (как было) ==============================================================
 # ======================================================================================
@@ -809,7 +861,7 @@ def _resolve_soundcloud_stream(api_url: str, client_id: str) -> Optional[str]:
 
 def make_stream_proxy_url(real_url: str) -> str:
     # отдаём клиенту ссылку на наш backend, а не прямой playback/cf-media
-    return f"{_CFG.api_base_url}?type=stream&u={requests.utils.quote(real_url, safe='')}"
+    return f"{_CFG.api_base_url}?type=stream&u={_strict_quote_url(real_url)}"
     
 def make_img_proxy_url(real_url: str) -> str:
     return f"{_CFG.api_base_url}?type=img&u={requests.utils.quote(real_url, safe='')}"
@@ -824,14 +876,14 @@ def _norm_soundcloud(item: Dict[str, Any], client_id: str) -> Dict[str, Any]:
     stream_url = None
     transcodings = item.get("media", {}).get("transcodings", [])
     for t in transcodings:
-        if "hls" in t.get("format", {}).get("protocol", ""):
+        if "progressive" in t.get("format", {}).get("protocol", ""):
             stream_url = _resolve_soundcloud_stream(t.get("url"), client_id)
             print("STREAM_URL =", stream_url)
             if stream_url:
                 break
     if not stream_url:
         for t in transcodings:
-            if "progressive" in t.get("format", {}).get("protocol", ""):
+            if "hls" in t.get("format", {}).get("protocol", ""):
                 stream_url = _resolve_soundcloud_stream(t.get("url"), client_id)
                 print("STREAM_URL =", stream_url)
                 if stream_url:
@@ -852,12 +904,17 @@ def _norm_soundcloud(item: Dict[str, Any], client_id: str) -> Dict[str, Any]:
     }
 
 
-def search_soundcloud(q: str, offset: int = 0, limit: int = 50) -> List[Dict[str, Any]]:
+def search_soundcloud(
+    q: str,
+    offset: int = 0,
+    limit: int = 50,
+    bypass_cache: bool = False,
+) -> List[Dict[str, Any]]:
     q_norm = " ".join((q or "").strip().split())
     offset = max(0, int(offset))
     limit = max(1, min(int(limit), 80))
     cache_key = f"soundcloud:{q_norm}:{offset}:{limit}"
-    cached = cache_get(cache_key)
+    cached = cache_get(cache_key) if not bypass_cache else None
     if cached:
         return cached
 
@@ -1388,7 +1445,13 @@ def search_artists_hint(service: str, q: str, limit: int = 8) -> List[Dict[str, 
     return []
 
 
-def search_enriched_v2(service: str, q: str, offset: int, limit: int) -> Dict[str, Any]:
+def search_enriched_v2(
+    service: str,
+    q: str,
+    offset: int,
+    limit: int,
+    refresh: bool = False,
+) -> Dict[str, Any]:
     service = (service or "yandex").lower()
     if service in ("itunes",):
         service = "yandex"
@@ -1409,7 +1472,7 @@ def search_enriched_v2(service: str, q: str, offset: int, limit: int) -> Dict[st
     elif service == "spotify":
         tracks = search_spotify(q, offset=offset, limit=limit)
     elif service == "soundcloud":
-        tracks = search_soundcloud(q, offset=offset, limit=limit)
+        tracks = search_soundcloud(q, offset=offset, limit=limit, bypass_cache=refresh)
     elif service == "vkmusic":
         tracks = search_vkmusic(q, performer_only=0, offset=offset, count=limit)
     else:
@@ -1545,6 +1608,13 @@ def handler(event, context):
                 return _response(400, {"error": "Missing track_id"})
             data = vk_preview(track_id)
             return _response(200, data)
+
+        # ----------------- SIMILAR (recommendations) -----------------
+        if req_type == "similar":
+            if not track_id:
+                return _response(400, {"error": "Missing track_id"})
+            data = yandex_similar_tracks(track_id)
+            return _response(200, data)
             
         # ----------------- SEARCH V2 (tracks + artists + pagination) -----------------
         if req_type == "search_v2":
@@ -1558,7 +1628,8 @@ def handler(event, context):
                 offset = int(_p("offset") or "0")
             except Exception:
                 offset = 0
-            payload = search_enriched_v2(service, q, offset, limit)
+            refresh = (_p("refresh").lower() in ("1", "true", "yes", "y", "on"))
+            payload = search_enriched_v2(service, q, offset, limit, refresh=refresh)
             return _response(200, payload)
 
         # ----------------- SEARCH (legacy: list of tracks, first page) -----------------

@@ -453,11 +453,10 @@ class _SpotifyMobileWaveBanner extends StatelessWidget {
             spin: isRunning && isPlaying,
             size: 72,
             enabled: !waveController.isLoading,
-            artworkUrl: currentTrack?.image,
+            artworkUrl: isRunning ? currentTrack?.image : null,
             onPlayClick: () {
               if (!isRunning) {
                 waveController.startWave(
-                  seedTrack: currentTrack,
                   playerController: playerController,
                 );
               } else {
@@ -531,7 +530,6 @@ class _SpotifyMobileWaveBanner extends StatelessWidget {
             onPressed: () {
               if (!isRunning) {
                 waveController.startWave(
-                  seedTrack: currentTrack,
                   playerController: playerController,
                 );
               } else {
@@ -600,11 +598,10 @@ class _HomeHero extends StatelessWidget {
               spin: isPlaying,
               size: compact ? 175 : 205,
               enabled: !waveController.isLoading,
-              artworkUrl: currentTrack?.image,
+              artworkUrl: isWaveRunning ? currentTrack?.image : null,
               onPlayClick: () {
                 if (!isWaveRunning) {
                   waveController.startWave(
-                    seedTrack: currentTrack,
                     playerController: playerController,
                   );
                 } else {
@@ -676,7 +673,6 @@ class _HomeHero extends StatelessWidget {
                           onPressed: () {
                             if (!isWaveRunning) {
                               waveController.startWave(
-                                seedTrack: currentTrack,
                                 playerController: playerController,
                               );
                             }

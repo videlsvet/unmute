@@ -30,6 +30,8 @@ class PlayerController extends ChangeNotifier {
   String? error;
   bool shuffleEnabled = false;
   RepeatMode repeatMode = RepeatMode.off;
+  bool isWavePlayback = false;
+  VoidCallback? onNonWavePlaybackStarted;
 
   StreamSubscription<bool>? _playingSub;
   StreamSubscription<Duration>? _positionSub;
@@ -77,15 +79,27 @@ class PlayerController extends ChangeNotifier {
   List<Track> get queue => _queue;
   int get currentIndex => _currentIndex;
 
-  Future<void> playTrack(Track track) async {
+  Future<void> playTrack(Track track, {bool isWave = false}) async {
+    isWavePlayback = isWave;
+    if (!isWave) {
+      onNonWavePlaybackStarted?.call();
+    }
     _queue = [track];
     _currentIndex = 0;
     await _playTrackInternal(track);
   }
 
-  Future<void> playTracks(List<Track> tracks, {required int startIndex}) async {
+  Future<void> playTracks(
+    List<Track> tracks, {
+    required int startIndex,
+    bool isWave = false,
+  }) async {
     if (tracks.isEmpty || startIndex < 0 || startIndex >= tracks.length) return;
 
+    isWavePlayback = isWave;
+    if (!isWave) {
+      onNonWavePlaybackStarted?.call();
+    }
     _queue = List<Track>.unmodifiable(tracks);
     _currentIndex = startIndex;
     await _playTrackInternal(_queue[startIndex]);

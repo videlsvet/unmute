@@ -639,6 +639,281 @@ def _search_soundcloud_preview_by_meta(title: str, artist: str) -> Optional[str]
         print("SoundCloud search by meta error:", e)
         return None
 
+
+def _row_album_year(row: Any) -> Optional[int]:
+    try:
+        raw = (getattr(row, "album_year", "") or "").strip()
+        return int(raw) if raw else None
+    except Exception:
+        return None
+
+
+def _track_dict_from_row(row: Any) -> Dict[str, Any]:
+    return {
+        "id": getattr(row, "track_id", "") or "",
+        "title": getattr(row, "title", "") or "",
+        "artist": getattr(row, "artist", "") or "",
+        "image": getattr(row, "image", "") or "",
+        "preview": getattr(row, "preview", "") or "",
+        "source": getattr(row, "source", "") or "",
+        "externalId": getattr(row, "external_id", "") or "",
+        "artist_id": getattr(row, "artist_id", "") or "",
+        "album_id": getattr(row, "album_id", "") or "",
+        "album_title": getattr(row, "album_title", "") or "",
+        "album_year": _row_album_year(row),
+        "owner_id": getattr(row, "owner_id", "") or "",
+        "audio_id": getattr(row, "audio_id", "") or "",
+        "access_key": getattr(row, "access_key", "") or "",
+    }
+
+
+def _split_artist_names(value: str) -> List[str]:
+    raw = (value or "").strip()
+    if not raw:
+        return []
+    parts = re.split(r"\s*(?:,|;|&|\+|\bfeat\.?\b|\bft\.?\b|\band\b|\bи\b)\s*", raw, flags=re.I)
+    return [p.strip() for p in parts if p.strip()]
+
+
+def _track_key(track: Dict[str, Any]) -> str:
+    source = (track.get("source") or "").strip().lower()
+    external = (track.get("externalId") or track.get("external_id") or track.get("id") or "").strip().lower()
+    if source or external:
+        return f"{source}:{external}"
+    return f"{(track.get('title') or '').strip().lower()}:{(track.get('artist') or '').strip().lower()}"
+
+
+def _search_wave_candidates(service: str, query: str, limit: int) -> List[Dict[str, Any]]:
+    query = " ".join((query or "").split())
+    if not query:
+        return []
+
+    try:
+        r = requests.get(
+            _get_search_backend_url(),
+            params={
+                "type": "search_v2",
+                "service": service,
+                "q": query,
+                "limit": max(4, min(int(limit), 40)),
+                "offset": 0,
+            },
+            timeout=12,
+        )
+        if r.status_code != 200:
+            return []
+
+        data = r.json()
+        if isinstance(data, dict):
+            raw_tracks = data.get("tracks") or []
+        elif isinstance(data, list):
+            raw_tracks = data
+        else:
+            raw_tracks = []
+
+        out: List[Dict[str, Any]] = []
+        for item in raw_tracks:
+            if not isinstance(item, dict) or item.get("error"):
+                continue
+            if not (item.get("source") or "").strip():
+                item["source"] = service
+            out.append(item)
+        return out
+    except Exception as e:
+        print("Wave search error:", type(e).__name__, str(e))
+        return []
+
+
+SIMILAR_ARTISTS_MAP: Dict[str, List[str]] = {
+    "скриптонит": ["104", "truwer", "niman", "saluki", "масло черного тмина", "t-fest", "баста"],
+    "saluki": ["boulevard depo", "сеня полоз", "thomas mraz", "og buda", "104", "скриптонит"],
+    "pharaoh": ["лсп", "boulevard depo", "mnogoznaal", "jeembo", "tveth", "saluki"],
+    "oxxxymiron": ["markul", "loqiemean", "porchy", "thomas mraz", "horus", "schokk", "atl"],
+    "boulevard depo": ["saluki", "pharaoh", "jeembo", "basic boy", "rocket"],
+    "big baby tape": ["kizaru", "aarne", "alblak 52", "friendly thug 52 ngg", "toxi$", "og buda"],
+    "kizaru": ["big baby tape", "alblak 52", "friendly thug 52 ngg"],
+    "friendly thug 52 ngg": ["alblak 52", "glocki52", "big baby tape", "kizaru"],
+    "macan": ["navai", "hammali & navai", "xcho", "jakone", "kiliana", "ramil"],
+    "miyagi & эндшпиль": ["andy panda", "tumaniyo", "castle", "mav-d", "krec"],
+    "miyagi": ["andy panda", "miyagi & эндшпиль", "tumaniyo", "castle", "rem digga"],
+    "дайте танк": ["ssshhhiiittt", "папин олимпос", "перемотка", "комсомольск", "валентин стрыкало"],
+    "дайте танк(!)": ["ssshhhiiittt", "папин олимпос", "перемотка", "комсомольск", "валентин стрыкало"],
+    "молчат дома": ["ploho", "буерак", "дурной вкус", "chernikovskaya hata", "электрофорез"],
+    "буерак": ["молчат дома", "ploho", "дурной вкус", "пасош", "увула"],
+    "сироткин": ["polnalyubvi", "мы", "свидание", "the retuses", "обе две"],
+    "polnalyubvi": ["сироткин", "мы", "свидание", "обе две", "алена швец"],
+    "король и шут": ["княzz", "сектор газа", "порнофильмы", "кукрыниксы", "эпидемия"],
+    "кино": ["наутилус помпилиус", "аквариум", "ддт", "алиса", "би-2", "сплин"],
+    "би-2": ["сплин", "земфира", "мумий тролль", "агата кристи", "кино"],
+    "сплин": ["би-2", "земфира", "мумий тролль", "кино", "наутилус помпилиус"],
+    "земфира": ["мумий тролль", "ночные снайперы", "сплин", "би-2"],
+    "linkin park": ["bring me the horizon", "three days grace", "evanescence", "papa roach", "breaking benjamin", "skillet"],
+    "the weeknd": ["travis scott", "drake", "post malone", "frank ocean", "joji", "kendrick lamar"],
+    "travis scott": ["metro boomin", "playboi carti", "21 savage", "don toliver", "a$ap rocky"],
+    "radiohead": ["the smile", "thom yorke", "muse", "coldplay", "massive attack", "portishead"],
+    "arctic monkeys": ["the neighbourhood", "the strokes", "gorillaz", "franz ferdinand", "foals"],
+    "daft punk": ["justice", "kavinsky", "the chemical brothers", "gesaffelstein", "carpenter brut"],
+    "billie eilish": ["lana del rey", "lorde", "finneas", "olivia rodrigo", "girl in red"],
+}
+
+
+def _get_similar_artists(artist_name: str) -> List[str]:
+    raw = (artist_name or "").strip().lower()
+    if not raw:
+        return []
+    if raw in SIMILAR_ARTISTS_MAP:
+        return list(SIMILAR_ARTISTS_MAP[raw])
+    for k, v in SIMILAR_ARTISTS_MAP.items():
+        if k in raw or raw in k:
+            return list(v)
+    return []
+
+
+def _build_wave_payload(session: Any, nickname: str, service: str, mode: str, limit: int) -> Dict[str, Any]:
+    service = (service or "yandex").strip().lower()
+    if service in ("auto", "all", ""):
+        service = "yandex"
+    if service in ("yandexmusic", "ya", "itunes"):
+        service = "yandex"
+    if service not in ("yandex", "vkmusic", "soundcloud", "spotify"):
+        service = "yandex"
+
+    mode = (mode or "flow").strip().lower()
+    if mode in ("balanced", "personal"):
+        mode = "flow"
+    if mode in ("discovery",):
+        mode = "exploration"
+    limit = max(12, min(int(limit or 36), 80))
+
+    # Independent of active playlist: recommendations are based strictly on user's tastes
+    q_fav = """
+        DECLARE $nickname AS Utf8;
+        SELECT
+          track_id, title, artist, image, preview, source, external_id,
+          artist_id, album_id, album_title, album_year,
+          owner_id, audio_id, access_key, liked_at
+        FROM user_favorites
+        WHERE nickname = $nickname
+        ORDER BY liked_at DESC
+        LIMIT 100;
+    """
+    fav_rows = _ydb_retry(
+        lambda: session.transaction().execute(
+            _prepare(session, q_fav),
+            {"$nickname": nickname},
+            commit_tx=True,
+        )
+    )
+    favorites = [_track_dict_from_row(row) for row in (fav_rows[0].rows if fav_rows else [])]
+
+    # Rank favorite artists by frequency
+    artist_counts: Dict[str, int] = {}
+    for t in favorites:
+        for a in _split_artist_names(t.get("artist") or ""):
+            a_norm = a.strip().lower()
+            if len(a_norm) >= 2:
+                artist_counts[a_norm] = artist_counts.get(a_norm, 0) + 1
+
+    top_artists = sorted(artist_counts.keys(), key=lambda k: artist_counts[k], reverse=True)
+
+    seeds: List[str] = []
+    seen_seeds = set()
+
+    def add_seed(val: str) -> None:
+        c = " ".join((val or "").split()).strip()
+        if len(c) < 2:
+            return
+        k = c.lower()
+        if k in seen_seeds:
+            return
+        seen_seeds.add(k)
+        seeds.append(c)
+
+    for a in top_artists[:6]:
+        add_seed(a)
+        for sim in _get_similar_artists(a)[:3]:
+            add_seed(sim)
+
+    if mode == "exploration":
+        for query in ("свежий инди рок", "новинки музыки", "indie alternative fresh", "новый русский хип хоп"):
+            add_seed(query)
+    elif mode == "energy":
+        for query in ("танцевальные хиты", "драйв рок", "клубная музыка energy", "бодрый хип хоп"):
+            add_seed(query)
+    elif mode == "calm":
+        for query in ("lo-fi chill relax", "спокойная музыка вечер", "акустика инди", "ambient chillout"):
+            add_seed(query)
+    elif mode == "coldstart" or not seeds:
+        for query in ("Daft Punk", "The Weeknd", "Radiohead", "Кино", "Billie Eilish", "Linkin Park", "Скриптонит"):
+            add_seed(query)
+
+    raw_candidates: List[Dict[str, Any]] = []
+    used_keys = set()
+    favorite_keys = {_track_key(item) for item in favorites}
+
+    # In flow mode, anchor ~25% familiar favorites
+    if mode == "flow" and favorites:
+        fav_sample = [f for f in favorites if (f.get("preview") or "").strip()][: max(2, min(8, limit // 4))]
+        for item in fav_sample:
+            k = _track_key(item)
+            if k not in used_keys:
+                used_keys.add(k)
+                raw_candidates.append(item)
+
+    per_seed = 10 if mode == "exploration" else 8
+    for seed in seeds[:12]:
+        found = _search_wave_candidates(service, seed, per_seed)
+        for item in found:
+            k = _track_key(item)
+            if k in used_keys:
+                continue
+            if mode == "exploration" and k in favorite_keys:
+                continue
+            used_keys.add(k)
+            raw_candidates.append(item)
+            if len(raw_candidates) >= limit * 2:
+                break
+        if len(raw_candidates) >= limit * 2:
+            break
+
+    # Sequence formatting & anti-fatigue:
+    # 1. No consecutive tracks by the same artist
+    # 2. Max 2 tracks per artist in the batch
+    final_tracks: List[Dict[str, Any]] = []
+    artist_counts_in_batch: Dict[str, int] = {}
+    last_artist: Optional[str] = None
+
+    for tr in raw_candidates:
+        if len(final_tracks) >= limit:
+            break
+        art = (tr.get("artist") or "").strip().lower()
+        if not art:
+            continue
+        primary_artist = _split_artist_names(art)[0].lower() if _split_artist_names(art) else art
+        if primary_artist == last_artist:
+            continue
+        if artist_counts_in_batch.get(primary_artist, 0) >= 2:
+            continue
+
+        final_tracks.append(tr)
+        artist_counts_in_batch[primary_artist] = artist_counts_in_batch.get(primary_artist, 0) + 1
+        last_artist = primary_artist
+
+    if len(final_tracks) < limit:
+        for tr in raw_candidates:
+            if len(final_tracks) >= limit:
+                break
+            if tr not in final_tracks:
+                final_tracks.append(tr)
+
+    return {
+        "service": service,
+        "mode": mode,
+        "tracks": final_tracks[:limit],
+        "seeds": seeds[:12],
+        "favorite_count": len(favorites),
+    }
+
 # ======================================
 #     Вспомогательные для плейлистов
 # ======================================
@@ -2053,6 +2328,30 @@ def handler(event, context):
             )
             return _resp(200, {"message": "unliked"})
 
+        elif action == "my_wave":
+            token = body.get("token")
+            if not token:
+                return _resp(400, {"error": "Token required"})
+
+            decoded, err = _decode_token(token)
+            if err:
+                return err
+            nickname = decoded.get("nickname")
+
+            try:
+                limit = int(body.get("limit") or 36)
+            except Exception:
+                limit = 36
+
+            payload = _build_wave_payload(
+                session=session,
+                nickname=nickname,
+                service=(body.get("service") or "yandex"),
+                mode=(body.get("mode") or "balanced"),
+                limit=limit,
+            )
+            return _resp(200, payload)
+
         # ✅ ЛЕНИВАЯ ЗАГРУЗКА: обновляем ссылку только когда юзер нажал play
         elif action == "get_stream":
             token = body.get("token")
@@ -2382,6 +2681,3 @@ def handler(event, context):
         print("❌ Unhandled error:", type(e).__name__, str(e))
         traceback.print_exc()
         return _resp(500, {"error": "Internal server error", "detail": str(e)})
-
-
-

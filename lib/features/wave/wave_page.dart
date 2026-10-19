@@ -145,11 +145,10 @@ class _WavePageState extends State<WavePage> {
                     spin: isWaveRunning && isPlaying,
                     size: discSize,
                     enabled: !isLoading,
-                    artworkUrl: currentTrack?.image,
+                    artworkUrl: isWaveRunning ? currentTrack?.image : null,
                     onPlayClick: () {
                       if (!isWaveRunning) {
                         widget.waveController.startWave(
-                          seedTrack: currentTrack,
                           playerController: widget.playerController,
                         );
                       } else {
@@ -164,7 +163,7 @@ class _WavePageState extends State<WavePage> {
             const SizedBox(height: 16),
 
             // Track Info (Spotify style: left-aligned, smaller artist text)
-            if (currentTrack != null) ...[
+            if (isWaveRunning && currentTrack != null) ...[
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 4),
                 child: Column(
@@ -231,14 +230,14 @@ class _WavePageState extends State<WavePage> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'Моя Волна',
+                      widget.waveController.mode.displayName,
                       style: Theme.of(context).textTheme.titleLarge?.copyWith(
                             fontWeight: FontWeight.w800,
                           ),
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      'Бесконечный персональный поток треков',
+                      widget.waveController.mode.description,
                       style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                             color: AppTheme.textSecondary,
                           ),
@@ -256,7 +255,7 @@ class _WavePageState extends State<WavePage> {
               children: [
                 // Dislike button
                 IconButton.filledTonal(
-                  onPressed: currentTrack != null && !isLoading
+                  onPressed: isWaveRunning && currentTrack != null && !isLoading
                       ? () => widget.waveController.dislikeTrack(
                             currentTrack,
                             playerController: widget.playerController,
@@ -305,7 +304,6 @@ class _WavePageState extends State<WavePage> {
                         : () {
                             if (!isWaveRunning) {
                               widget.waveController.startWave(
-                                seedTrack: currentTrack,
                                 playerController: widget.playerController,
                               );
                             } else {
@@ -338,7 +336,7 @@ class _WavePageState extends State<WavePage> {
 
                 // Next track
                 IconButton.filledTonal(
-                  onPressed: widget.playerController.canPlayNext
+                  onPressed: isWaveRunning && widget.playerController.canPlayNext
                       ? () => widget.playerController.playNext()
                       : null,
                   tooltip: 'Следующий трек',
@@ -353,7 +351,7 @@ class _WavePageState extends State<WavePage> {
 
                 // Favorite / Like button
                 IconButton.filledTonal(
-                  onPressed: currentTrack != null
+                  onPressed: isWaveRunning && currentTrack != null
                       ? () => widget.onToggleFavorite(currentTrack)
                       : null,
                   tooltip: isFavorite ? 'В избранном' : 'Добавить в избранное',
@@ -376,14 +374,15 @@ class _WavePageState extends State<WavePage> {
               ],
             ),
 
-            const SizedBox(height: 24),
-
-            // Wave Queue Preview (no PremiumSurface wrapper on mobile)
-            _WaveQueuePreview(
-              playerController: widget.playerController,
-              onOpenAlbum: widget.onOpenAlbum,
-              isMobile: true,
-            ),
+            if (isWaveRunning) ...[
+              const SizedBox(height: 24),
+              // Wave Queue Preview (no PremiumSurface wrapper on mobile)
+              _WaveQueuePreview(
+                playerController: widget.playerController,
+                onOpenAlbum: widget.onOpenAlbum,
+                isMobile: true,
+              ),
+            ],
           ],
         ),
       ),
@@ -434,11 +433,10 @@ class _WavePageState extends State<WavePage> {
                   spin: isWaveRunning && isPlaying,
                   size: discSize,
                   enabled: !isLoading,
-                  artworkUrl: currentTrack?.image,
+                  artworkUrl: isWaveRunning ? currentTrack?.image : null,
                   onPlayClick: () {
                     if (!isWaveRunning) {
                       widget.waveController.startWave(
-                        seedTrack: currentTrack,
                         playerController: widget.playerController,
                       );
                     } else {
@@ -453,7 +451,7 @@ class _WavePageState extends State<WavePage> {
           const SizedBox(height: 24),
 
           // Track Info
-          if (currentTrack != null) ...[
+          if (isWaveRunning && currentTrack != null) ...[
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16),
               child: Column(
@@ -507,14 +505,14 @@ class _WavePageState extends State<WavePage> {
             ),
           ] else ...[
             Text(
-              'Моя Волна',
+              widget.waveController.mode.displayName,
               style: Theme.of(context).textTheme.headlineMedium?.copyWith(
                     fontWeight: FontWeight.w800,
                   ),
             ),
             const SizedBox(height: 6),
             Text(
-              'Бесконечный персональный поток треков',
+              widget.waveController.mode.description,
               style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                     color: AppTheme.textSecondary,
                   ),
@@ -529,7 +527,7 @@ class _WavePageState extends State<WavePage> {
             children: [
               // Dislike button
               IconButton.filledTonal(
-                onPressed: currentTrack != null && !isLoading
+                onPressed: isWaveRunning && currentTrack != null && !isLoading
                     ? () => widget.waveController.dislikeTrack(
                           currentTrack,
                           playerController: widget.playerController,
@@ -547,7 +545,7 @@ class _WavePageState extends State<WavePage> {
 
               // Previous track
               IconButton.filledTonal(
-                onPressed: widget.playerController.canPlayPrevious
+                onPressed: isWaveRunning && widget.playerController.canPlayPrevious
                     ? () => widget.playerController.playPrevious()
                     : null,
                 tooltip: 'Предыдущий трек',
@@ -578,7 +576,6 @@ class _WavePageState extends State<WavePage> {
                       : () {
                           if (!isWaveRunning) {
                             widget.waveController.startWave(
-                              seedTrack: currentTrack,
                               playerController: widget.playerController,
                             );
                           } else {
@@ -611,7 +608,7 @@ class _WavePageState extends State<WavePage> {
 
               // Next track
               IconButton.filledTonal(
-                onPressed: widget.playerController.canPlayNext
+                onPressed: isWaveRunning && widget.playerController.canPlayNext
                     ? () => widget.playerController.playNext()
                     : null,
                 tooltip: 'Следующий трек',
@@ -626,7 +623,7 @@ class _WavePageState extends State<WavePage> {
 
               // Favorite / Like button
               IconButton.filledTonal(
-                onPressed: currentTrack != null
+                onPressed: isWaveRunning && currentTrack != null
                     ? () => widget.onToggleFavorite(currentTrack)
                     : null,
                 tooltip: isFavorite ? 'В избранном' : 'Добавить в избранное',
@@ -639,8 +636,8 @@ class _WavePageState extends State<WavePage> {
                 ),
                 style: IconButton.styleFrom(
                   backgroundColor: isFavorite
-                      ? AppTheme.accent.withValues(alpha: 0.2)
-                      : Colors.white.withValues(alpha: 0.08),
+                        ? AppTheme.accent.withValues(alpha: 0.2)
+                        : Colors.white.withValues(alpha: 0.08),
                   foregroundColor: isFavorite ? AppTheme.accent2 : Colors.white,
                   padding: const EdgeInsets.all(12),
                 ),
@@ -648,13 +645,14 @@ class _WavePageState extends State<WavePage> {
             ],
           ),
 
-          const SizedBox(height: 28),
-
-          // Wave Queue Preview
-          _WaveQueuePreview(
-            playerController: widget.playerController,
-            onOpenAlbum: widget.onOpenAlbum,
-          ),
+          if (isWaveRunning) ...[
+            const SizedBox(height: 28),
+            // Wave Queue Preview
+            _WaveQueuePreview(
+              playerController: widget.playerController,
+              onOpenAlbum: widget.onOpenAlbum,
+            ),
+          ],
         ],
       ),
     );

@@ -259,4 +259,27 @@ class MusicService {
     }
     throw Exception('Некорректный формат ответа альбома');
   }
+
+  Future<List<Track>> loadSimilarTracks({
+    required String service,
+    required String trackId,
+  }) async {
+    final params = <String, String>{
+      'type': 'similar',
+      'service': service,
+      'track_id': trackId,
+    };
+
+    try {
+      final data = await _fetchWithFallback(params);
+      if (data is List) {
+        return data
+            .whereType<Map>()
+            .map((e) => Track.fromJson(Map<String, dynamic>.from(e)))
+            .where((t) => (t.error ?? '').isEmpty)
+            .toList();
+      }
+    } catch (_) {}
+    return const [];
+  }
 }

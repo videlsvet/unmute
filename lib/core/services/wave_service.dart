@@ -106,12 +106,167 @@ bool _containsVersionWords(String x) {
 // ══════════════════════════════════════════════════════════════
 
 enum WaveMode {
-  flow,        // Моя Волна (персональный поток)
-  exploration, // Открытия
-  favorites,   // Любимое
-  energy,      // Драйв
-  calm,        // Спокойное
-  coldStart,   // Популярное
+  flow,        // Моя Волна (персональный сбалансированный поток)
+  exploration, // Открытия (незнакомое, свежие находки)
+  favorites,   // Любимое (золотая коллекция пользователя)
+  energy,      // Драйв (бодрое, танцевальное, рок/хип-хоп)
+  calm,        // Спокойное (чилл, релакс, акустика, lo-fi)
+  coldStart,   // Популярное (хиты и топ чарты)
+}
+
+extension WaveModeX on WaveMode {
+  String get displayName {
+    switch (this) {
+      case WaveMode.flow:
+        return 'Моя Волна';
+      case WaveMode.exploration:
+        return 'Открытия';
+      case WaveMode.favorites:
+        return 'Любимое';
+      case WaveMode.energy:
+        return 'Драйв';
+      case WaveMode.calm:
+        return 'Спокойное';
+      case WaveMode.coldStart:
+        return 'Популярное';
+    }
+  }
+
+  String get description {
+    switch (this) {
+      case WaveMode.flow:
+        return 'Персональный поток рекомендаций под ваш вкус';
+      case WaveMode.exploration:
+        return 'Свежие треки и новые имена, похожие на ваших любимых артистов';
+      case WaveMode.favorites:
+        return 'Только любимые и проверенные треки из вашей коллекции';
+      case WaveMode.energy:
+        return 'Энергичные, ритмичные и драйвовые треки для движения';
+      case WaveMode.calm:
+        return 'Спокойная, атмосферная музыка для отдыха и концентрации';
+      case WaveMode.coldStart:
+        return 'Самые популярные треки и хиты чартов';
+    }
+  }
+}
+
+// ══════════════════════════════════════════════════════════════
+//          ARTIST SIMILARITY GRAPH (COLLABORATIVE MAP)
+// ══════════════════════════════════════════════════════════════
+
+/// Knowledge graph mapping artists to closely related artists across genres.
+/// Simulates Yandex Music's collaborative filtering embeddings.
+class ArtistSimilarityGraph {
+  static final Map<String, List<String>> _similarityMap = {
+    // Russian Hip-Hop / Trap
+    'скриптонит': ['104', 'truwer', 'niman', 'saluki', 'масло черного тмина', 't fest', 'баста'],
+    'saluki': ['boulevard depo', 'сеня полоз', 'thomas mraz', 'og buda', '104', 'скриптонит'],
+    'pharaoh': ['лсп', 'boulevard depo', 'mnogoznaal', 'jeembo', 'tveth', 'saluki', 'dead dynasty'],
+    'oxxxymiron': ['markul', 'loqiemean', 'porchy', 'thomas mraz', 'horus', 'schokk', 'atl'],
+    'boulevard depo': ['saluki', 'pharaoh', 'jeembo', 'basic boy', 'glebasta spal', 'rocket'],
+    'big baby tape': ['kizaru', 'aarne', 'alblak 52', 'friendly thug 52 ngg', r'toxi$', 'og buda'],
+    'kizaru': ['big baby tape', 'alblak 52', 'friendly thug 52 ngg', 'obratno', 'hoodrich pablo juan'],
+    'friendly thug 52 ngg': ['alblak 52', 'glocki52', 'saintprince 52', 'big baby tape', 'kizaru'],
+    'alblak 52': ['friendly thug 52 ngg', 'glocki52', 'big baby tape', 'kizaru'],
+    'macan': ['navai', 'hammali navai', 'xcho', 'jakone', 'kiliana', 'ramil'],
+    'miyagi эндшпиль': ['andy panda', 'miyagi', 'tumaniyo', 'castle', 'mav d', 'krec', 'hloy'],
+    'miyagi': ['andy panda', 'miyagi эндшпиль', 'tumaniyo', 'castle', 'hloy', 'rem digga'],
+    'andy panda': ['miyagi', 'miyagi эндшпиль', 'tumaniyo', 'castle', 'hloy'],
+    'atl': ['горизонт', 'loqiemean', 'егор натс', 'oxxxymiron', 'пика', 'зараза'],
+    'markul': ['oxxxymiron', 'thomas mraz', 'obladaet', 'платина', 'feduk'],
+    'og buda': ['mayot', 'seventeen', r'toxi$', 'scally milano', '163onmyneck', 'saluki'],
+    'mayot': ['og buda', 'seventeen', 'scally milano', '163onmyneck', r'toxi$'],
+    r'toxi$': ['og buda', 'mayot', 'big baby tape', 'aarne', 'heronwater'],
+
+    // Russian Indie / Post-Punk / Alternative
+    'дайте танк': ['ssshhhiiittt', 'папин олимпос', 'перемотка', 'комсомольск', 'валентин стрыкало', 'петля пристрастия'],
+    'молчат дома': ['ploho', 'буерак', 'дурной вкус', 'chernikovskaya hata', 'электрофорез', 'союз'],
+    'буерак': ['молчат дома', 'ploho', 'дурной вкус', 'пасош', 'увула', 'электрофорез'],
+    'ssshhhiiittt': ['дайте танк', 'папин олимпос', 'перемотка', 'пасош', 'пошлая молли'],
+    'папин олимпос': ['дайте танк', 'ssshhhiiittt', 'три дня дождя', 'валентин стрыкало'],
+    'три дня дождя': ['zivert', 'папин олимпос', 'мукка', 'кис кис', 'тринадцать карат'],
+    'сироткин': ['polnalyubvi', 'мы', 'свидание', 'the retuses', 'обе две', 'тима ищет свет'],
+    'polnalyubvi': ['сироткин', 'мы', 'свидание', 'обе две', 'маяковский', 'алена швец'],
+    'перемотка': ['дайте танк', 'молчат дома', 'буерак', 'ssshhhiiittt', 'дурной вкус'],
+    'электрофорез': ['молчат дома', 'буерак', 'ploho', 'shortparis', 'ic3peak'],
+    'shortparis': ['электрофорез', 'ic3peak', 'аигел', 'хадн дадн', 'глупый белый'],
+    'валентин стрыкало': ['дайте танк', 'папин олимпос', 'ssshhhiiittt', 'пошлая молли', 'нервы'],
+    'нервы': ['валентин стрыкало', 'пошлая молли', 'три дня дождя', 'папин олимпос'],
+
+    // Russian Rock & Classic
+    'король и шут': ['княzz', 'сектор газа', 'порнофильмы', 'кукрыниксы', 'эпидемия', 'кипелов'],
+    'княzz': ['король и шут', 'сектор газа', 'кукрыниксы', 'ария'],
+    'сектор газа': ['король и шут', 'княzz', 'гражданская оборона', 'ленинград'],
+    'кино': ['наутилус помпилиус', 'аквариум', 'ддт', 'алиса', 'би 2', 'сплин', 'виктор цой'],
+    'наутилус помпилиус': ['кино', 'сплин', 'агата кристи', 'пикник', 'ддт', 'би 2'],
+    'би 2': ['сплин', 'земфира', 'мумий тролль', 'агата кристи', 'кино', 'ночные снайперы'],
+    'сплин': ['би 2', 'земфира', 'мумий тролль', 'кино', 'наутилус помпилиус', 'animal джаz'],
+    'земфира': ['мумий тролль', 'ночные снайперы', 'сплин', 'би 2', 'моя мишель'],
+    'агата кристи': ['наутилус помпилиус', 'пикник', 'сплин', 'король и шут'],
+    'порнофильмы': ['король и шут', 'йорш', 'тараканы', 'люмен', 'lumen', 'план ломоносова'],
+
+    // Russian Pop / Electronic
+    'anna asti': ['zivert', 'мари краймбрери', 'jony', 'seville', 'люся чеботина', 'artik asti'],
+    'zivert': ['anna asti', 'мари краймбрери', 'cream soda', 'jony', 'моя мишель'],
+    'cream soda': ['антоха мс', 'tesla boy', 'иван дорн', 'kedr livanskiy', 'лауд'],
+    'jony': ['hammali navai', 'navai', 'motto', 'andry', 'elmin', 'xcho', 'rauf faik'],
+
+    // International Rock / Metal / Alternative
+    'linkin park': ['bring me the horizon', 'three days grace', 'evanescence', 'papa roach', 'breaking benjamin', 'skillet'],
+    'bring me the horizon': ['linkin park', 'bad omens', 'architects', 'falling in reverse', 'i prevail'],
+    'three days grace': ['linkin park', 'skillet', 'breaking benjamin', 'saint asonia', 'shinedown'],
+    'deftones': ['korn', 'slipknot', 'system of a down', 'alice in chains', 'tool', 'chevelle'],
+    'system of a down': ['deftones', 'korn', 'slipknot', 'rage against the machine', 'serj tankian'],
+    'radiohead': ['the smile', 'thom yorke', 'muse', 'coldplay', 'massive attack', 'portishead'],
+    'arctic monkeys': ['the neighbourhood', 'the strokes', 'gorillaz', 'franz ferdinand', 'foals'],
+    'the neighbourhood': ['arctic monkeys', 'chase atlantic', 'cigarettes after sex', 'lana del rey', 'joji'],
+    'cigarettes after sex': ['the neighbourhood', 'beach house', 'mazzy star', 'lana del rey'],
+    'nirvana': ['foo fighters', 'soundgarden', 'pearl jam', 'alice in chains', 'the smashing pumpkins'],
+    'rammstein': ['lindemann', 'oomph', 'eisbrecher', 'megaherz', 'pain'],
+
+    // International Hip-Hop & R&B
+    'the weeknd': ['travis scott', 'drake', 'post malone', 'frank ocean', 'joji', 'kendrick lamar'],
+    'travis scott': ['metro boomin', 'playboi carti', '21 savage', 'don toliver', 'asap rocky'],
+    'kanye west': ['kid cudi', 'asap rocky', 'tyler the creator', 'pusha t', 'kendrick lamar', 'jay z'],
+    'drake': ['the weeknd', 'travis scott', 'future', '21 savage', 'partynextdoor'],
+    'kendrick lamar': ['j cole', 'kanye west', 'baby keem', 'asap rocky', 'schoolboy q'],
+    'joji': ['the neighbourhood', 'chase atlantic', 'the weeknd', 'frank ocean', 'keshi'],
+    'post malone': ['the weeknd', 'juice wrld', 'xxxtentacion', 'lil peep', 'iann dior'],
+    'eminem': ['50 cent', 'dr dre', '2pac', 'snoop dogg', 'royce da 5 9'],
+
+    // International Electronic & Synthwave
+    'daft punk': ['justice', 'kavinsky', 'the chemical brothers', 'gesaffelstein', 'carpenter brut', 'moderat'],
+    'gesaffelstein': ['daft punk', 'kavinsky', 'boyz noize', 'carpenter brut', 'perturbator'],
+    'kavinsky': ['daft punk', 'gesaffelstein', 'carpenter brut', 'perturbator', 'lorn'],
+    'burial': ['four tet', 'bonobo', 'tycho', 'boards of canada', 'aphex twin', 'jon hopkins'],
+    'bonobo': ['tycho', 'four tet', 'maribou state', 'burial', 'emancipator', 'olafor arnalds'],
+    'massive attack': ['portishead', 'tricky', 'morcheeba', 'radiohead', 'sneaker pimps'],
+
+    // International Pop & Indie
+    'billie eilish': ['lana del rey', 'lorde', 'finneas', 'olivia rodrigo', 'girl in red', 'clairo'],
+    'lana del rey': ['billie eilish', 'the neighbourhood', 'marina', 'arctic monkeys', 'florence the machine'],
+    'dua lipa': ['the weeknd', 'miley cyrus', 'doja cat', 'charli xcx', 'ava max'],
+  };
+
+  /// Returns known similar artists for [rawArtist].
+  static List<String> getKindredArtists(String? rawArtist) {
+    final key = canonicalArtist(rawArtist);
+    if (key.isEmpty) return const [];
+
+    // Exact key lookup
+    if (_similarityMap.containsKey(key)) {
+      return List<String>.from(_similarityMap[key]!);
+    }
+
+    // Substring or prefix lookup
+    for (final entry in _similarityMap.entries) {
+      if (entry.key.contains(key) || key.contains(entry.key)) {
+        return List<String>.from(entry.value);
+      }
+    }
+
+    return const [];
+  }
 }
 
 // ══════════════════════════════════════════════════════════════
@@ -119,14 +274,16 @@ enum WaveMode {
 // ══════════════════════════════════════════════════════════════
 
 class WaveProfileStore {
-  static const _keyArtists = 'wave_profile_artists';
-  static const _keyGenres = 'wave_profile_genres';
-  static const _keyHistory = 'wave_profile_history';
-  static const _keyDislikes = 'wave_profile_dislikes';
-  static const _keySkips = 'wave_profile_skips';
+  static const _keyArtists = 'wave_profile_artists_v2';
+  static const _keyHistory = 'wave_profile_history_v2';
+  static const _keyDislikes = 'wave_profile_dislikes_v2';
+  static const _keySkips = 'wave_profile_skips_v2';
 
   static const int _historyMax = 500;
-  static const int _dislikesMax = 200;
+  static const int _dislikesMax = 300;
+
+  /// In-memory session set of artists that were quickly skipped to steer away in this session.
+  final Set<String> sessionSkippedArtists = {};
 
   String makeTrackKey(String? artist, String? title) {
     final a = canonicalArtist(artist);
@@ -135,6 +292,7 @@ class WaveProfileStore {
     return '$a—$t';
   }
 
+  /// Returns top artists weighted by listen affinity and recency decay.
   Future<List<String>> topArtists(int n) async {
     final prefs = await SharedPreferences.getInstance();
     final raw = prefs.getString(_keyArtists);
@@ -144,19 +302,19 @@ class WaveProfileStore {
       final map = Map<String, dynamic>.from(jsonDecode(raw) as Map);
       final now = DateTime.now().millisecondsSinceEpoch;
 
-      final scored = <MapEntry<String, int>>[];
+      final scored = <MapEntry<String, double>>[];
       for (final entry in map.entries) {
         final artist = entry.key;
         final data = Map<String, dynamic>.from(entry.value as Map);
-        final score = (data['score'] as num?)?.toInt() ?? 0;
+        final score = (data['score'] as num?)?.toDouble() ?? 0.0;
         final lastPlayed = (data['lastPlayed'] as num?)?.toInt() ?? 0;
 
-        // Decay: -1 point every 7 days without listening
-        final daysSince = (now - lastPlayed) ~/ (1000 * 60 * 60 * 24);
-        final decay = daysSince ~/ 7;
-        final finalScore = max(0, score - decay);
+        // Exponential decay: half-life ~14 days without listening
+        final daysSince = max(0, (now - lastPlayed) / (1000 * 60 * 60 * 24));
+        final decayFactor = pow(0.95, daysSince).toDouble();
+        final finalScore = score * decayFactor;
 
-        if (finalScore > 0) {
+        if (finalScore > 0.5) {
           scored.add(MapEntry(artist, finalScore));
         }
       }
@@ -168,7 +326,7 @@ class WaveProfileStore {
     }
   }
 
-  Future<void> adjustArtist(String? artistRaw, int delta) async {
+  Future<void> adjustArtist(String? artistRaw, double delta) async {
     final artist = canonicalArtist(artistRaw);
     if (artist.isEmpty) return;
 
@@ -182,13 +340,13 @@ class WaveProfileStore {
     }
 
     final data = Map<String, dynamic>.from((map[artist] as Map?) ?? {});
-    final currentScore = (data['score'] as num?)?.toInt() ?? 0;
-    final newScore = (currentScore + delta).clamp(-50, 999);
+    final currentScore = (data['score'] as num?)?.toDouble() ?? 0.0;
+    final newScore = (currentScore + delta).clamp(-50.0, 999.0);
 
     data['score'] = newScore;
     data['lastPlayed'] = DateTime.now().millisecondsSinceEpoch;
 
-    if (newScore <= 0) {
+    if (newScore <= 0.0) {
       map.remove(artist);
     } else {
       map[artist] = data;
@@ -197,26 +355,25 @@ class WaveProfileStore {
     await prefs.setString(_keyArtists, jsonEncode(map));
   }
 
-  Future<void> onLikeTrack(String? artist) => adjustArtist(artist, 3);
-  Future<void> onPlayTrack(String? artist) => adjustArtist(artist, 1);
-  Future<void> onDislikeTrack(String? artist) => adjustArtist(artist, -5);
-  Future<void> onSkipTrack(String? artist) => adjustArtist(artist, -1);
+  /// Full listen through (>30s or >70% duration): high interest reward.
+  Future<void> onCompletedListen(String? artist) => adjustArtist(artist, 2.5);
 
-  Future<List<String>> topGenres(int n) async {
-    final prefs = await SharedPreferences.getInstance();
-    final raw = prefs.getString(_keyGenres);
-    if (raw == null || raw.isEmpty) return const [];
+  /// User explicitly liked the track.
+  Future<void> onLikeTrack(String? artist) => adjustArtist(artist, 5.0);
 
-    try {
-      final map = Map<String, dynamic>.from(jsonDecode(raw) as Map);
-      final entries = map.entries
-          .map((e) => MapEntry(e.key, (e.value as num?)?.toInt() ?? 0))
-          .toList();
-      entries.sort((a, b) => b.value.compareTo(a.value));
-      return entries.take(n).map((e) => e.key).toList();
-    } catch (_) {
-      return const [];
+  /// Normal start of track.
+  Future<void> onPlayTrack(String? artist) => adjustArtist(artist, 0.5);
+
+  /// User explicitly disliked track: severe penalty.
+  Future<void> onDislikeTrack(String? artist) => adjustArtist(artist, -15.0);
+
+  /// Quick skip (<15s): negative feedback.
+  Future<void> onSkipTrack(String? artist) {
+    final a = canonicalArtist(artist);
+    if (a.isNotEmpty) {
+      sessionSkippedArtists.add(a);
     }
+    return adjustArtist(artist, -2.5);
   }
 
   Future<Set<String>> historyKeysLast(int n) async {
@@ -339,131 +496,191 @@ class WaveGenerator {
 
   final Set<String> _sessionPlayedKeys = {};
 
+  /// Generates a fresh, cohesive queue of recommended tracks.
+  ///
+  /// CRITICAL: This is strictly independent of whatever playlist was playing before!
+  /// It builds recommendations from the user's taste profile, similar artists graph,
+  /// and selected [mode].
   Future<List<Track>> generate({
-    String? seedArtistRaw,
-    String? seedTitleRaw,
     int amount = 30,
     WaveMode mode = WaveMode.flow,
   }) async {
-    final seedArtist = canonicalArtist(seedArtistRaw);
-
-    final topArtists = await store.topArtists(10);
+    final topStoredArtists = await store.topArtists(12);
     final historySet = await store.historyKeysLast(150);
 
     // 1. Fetch user's saved favorites
     List<Track> userFavorites = const [];
+    String? token;
     if (authService != null) {
       try {
-        final token = await authService!.getSavedToken();
+        token = await authService!.getSavedToken();
         if (token != null && token.isNotEmpty) {
           userFavorites = await authService!.listFavorites(token);
         }
       } catch (_) {}
     }
 
-    // 2. Mode: FAVORITES - play directly from user's liked tracks
+    // 2. Mode: FAVORITES - play purely from user's liked collection + top artists
     if (mode == WaveMode.favorites && userFavorites.isNotEmpty) {
       final validFavs = <Track>[];
       for (final t in userFavorites) {
         if (!t.hasPlayableUrl) continue;
         final k = store.makeTrackKey(t.artist, t.title);
         if (await store.isDisliked(k)) continue;
+        if (_sessionPlayedKeys.contains(k)) continue;
         validFavs.add(t);
       }
       if (validFavs.isNotEmpty) {
         validFavs.shuffle(_random);
-        return validFavs.take(amount).toList();
+        final formatted = _enforceAntiFatigue(validFavs, amount);
+        for (final t in formatted) {
+          _sessionPlayedKeys.add(store.makeTrackKey(t.artist, t.title));
+        }
+        return formatted;
       }
     }
 
-    // 3. Extract user's favorite artists ranked by frequency
-    final artistFrequency = <String, int>{};
+    // 3. Extract user's core taste artists (combining favorites + history)
+    final artistFrequency = <String, double>{};
     for (final t in userFavorites) {
       final a = canonicalArtist(t.artist);
       if (a.isNotEmpty) {
-        artistFrequency[a] = (artistFrequency[a] ?? 0) + 1;
+        artistFrequency[a] = (artistFrequency[a] ?? 0.0) + 2.0;
       }
     }
-    // Add top artists from listening history
-    for (var i = 0; i < topArtists.length; i++) {
-      final a = canonicalArtist(topArtists[i]);
+    for (var i = 0; i < topStoredArtists.length; i++) {
+      final a = canonicalArtist(topStoredArtists[i]);
       if (a.isNotEmpty) {
-        artistFrequency[a] = (artistFrequency[a] ?? 0) + (topArtists.length - i);
+        final weight = (topStoredArtists.length - i).toDouble();
+        artistFrequency[a] = (artistFrequency[a] ?? 0.0) + weight;
       }
     }
 
     final rankedArtists = artistFrequency.keys.toList()
-      ..sort((a, b) => (artistFrequency[b] ?? 0).compareTo(artistFrequency[a] ?? 0));
+      ..sort((a, b) => (artistFrequency[b] ?? 0.0).compareTo(artistFrequency[a] ?? 0.0));
 
-    // Fallback if user has no favorites and no seed
-    if (rankedArtists.isEmpty && seedArtist.isEmpty) {
+    // Fallback if brand new user without any history or likes
+    if (rankedArtists.isEmpty) {
       return generateColdStart(amount);
     }
 
-    // 4. Select top artists to search for
+    // 4. Expand seeds using the Similarity Graph (Collaborative Filtering)
+    final coreArtists = rankedArtists.take(8).toList();
+    final kindredArtists = <String>{};
+    for (final artist in coreArtists) {
+      final similar = ArtistSimilarityGraph.getKindredArtists(artist);
+      for (final s in similar) {
+        final can = canonicalArtist(s);
+        if (can.isNotEmpty && !rankedArtists.contains(can)) {
+          kindredArtists.add(s);
+        }
+      }
+    }
+
+    // 5. Build dynamic search queries based on mode & taste
     final searchQueries = <String>[];
-    if (seedArtist.isNotEmpty) {
-      searchQueries.add(seedArtist);
-    }
 
-    // Pick top favorite artists
-    final availableArtists = rankedArtists.where((a) => a != seedArtist).toList();
-    if (availableArtists.isNotEmpty) {
-      availableArtists.shuffle(_random);
-      searchQueries.addAll(availableArtists.take(3));
-    }
-
-    // Mood query additions
+    // Mode-specific query synthesis
     switch (mode) {
+      case WaveMode.flow:
+        // Balanced: Mix favorite artist anchors and kindred artists
+        final shuffledCore = List<String>.from(coreArtists)..shuffle(_random);
+        searchQueries.addAll(shuffledCore.take(2));
+        final shuffledKindred = kindredArtists.toList()..shuffle(_random);
+        searchQueries.addAll(shuffledKindred.take(2));
+        break;
+
       case WaveMode.exploration:
-        const explorationQueries = [
+        // Discovery: Heavy on kindred artists and fresh genre discovery
+        final shuffledKindred = kindredArtists.toList()..shuffle(_random);
+        searchQueries.addAll(shuffledKindred.take(3));
+        const discoveryQueries = [
           'свежий инди рок',
           'новая русская музыка',
-          'indie pop new',
+          'indie alternative new',
+          'свежий хип хоп новинки',
           'открытия музыка',
         ];
-        searchQueries.add(explorationQueries[_random.nextInt(explorationQueries.length)]);
+        searchQueries.add(discoveryQueries[_random.nextInt(discoveryQueries.length)]);
         break;
+
       case WaveMode.energy:
+        final shuffledCore = List<String>.from(coreArtists)..shuffle(_random);
+        if (shuffledCore.isNotEmpty) {
+          searchQueries.add('${shuffledCore.first} remix');
+        }
         const energyQueries = [
           'танцевальные хиты',
           'драйв рок',
-          'клубная музыка',
+          'клубная музыка energy',
+          'бодрый хип хоп',
         ];
         searchQueries.add(energyQueries[_random.nextInt(energyQueries.length)]);
         break;
+
       case WaveMode.calm:
+        final shuffledCore = List<String>.from(coreArtists)..shuffle(_random);
+        if (shuffledCore.isNotEmpty) {
+          searchQueries.add('${shuffledCore.first} acoustic');
+        }
         const calmQueries = [
-          'спокойная музыка chill',
-          'lo-fi relax',
-          'акустика вечер',
+          'lo-fi relax chill',
+          'спокойная музыка акустика',
+          'вечерний чилл инди',
+          'ambient chillout',
         ];
         searchQueries.add(calmQueries[_random.nextInt(calmQueries.length)]);
         break;
+
       case WaveMode.coldStart:
         searchQueries.add('топ чарт хиты');
         break;
-      case WaveMode.flow:
+
       case WaveMode.favorites:
         break;
     }
 
-    // Dedup and take at most 3 queries for maximum parallel speed
-    final finalQueries = searchQueries.toSet().take(3).toList();
+    // Dedup and select top 3-4 queries for fast parallel search
+    final finalQueries = searchQueries.toSet().take(4).toList();
 
-    // 5. PARALLEL FETCHING: Dispatch all queries at once
+    // 6. PARALLEL FETCH: Gather candidates from search and server Wave endpoint
+    final rawCandidates = <Track>[];
+
+    // A) Server Wave endpoint (if authenticated)
+    Future<List<Track>>? serverWaveFuture;
+    if (token != null && token.isNotEmpty && authService != null) {
+      serverWaveFuture = authService!
+          .getMyWave(
+            token: token,
+            service: 'yandex',
+            mode: mode.name,
+            limit: 30,
+          )
+          .catchError((_) => <Track>[]);
+    }
+
+    // B) Parallel search queries
     final searchFutures = finalQueries.map((q) => _safeSearch(q, 'yandex'));
-    final results = await Future.wait(searchFutures).timeout(
+
+    final searchResults = await Future.wait(searchFutures).timeout(
       const Duration(milliseconds: 3200),
       onTimeout: () => <List<Track>>[],
     );
-
-    final candidates = <Track>[];
-    for (final list in results) {
-      candidates.addAll(list);
+    for (final list in searchResults) {
+      rawCandidates.addAll(list);
     }
 
-    // 6. In FLOW mode: Mix in familiar favorite tracks directly (~30-40%)
+    if (serverWaveFuture != null) {
+      try {
+        final serverTracks = await serverWaveFuture.timeout(
+          const Duration(milliseconds: 2000),
+          onTimeout: () => <Track>[],
+        );
+        rawCandidates.addAll(serverTracks);
+      } catch (_) {}
+    }
+
+    // 7. Familiar anchors: In FLOW mode, mix in ~25% familiar favorites
     final pickedFamiliar = <Track>[];
     if (userFavorites.isNotEmpty && mode == WaveMode.flow) {
       final eligibleFavs = userFavorites.where((t) {
@@ -471,14 +688,14 @@ class WaveGenerator {
         final k = store.makeTrackKey(t.artist, t.title);
         return !_sessionPlayedKeys.contains(k);
       }).toList()..shuffle(_random);
-      pickedFamiliar.addAll(eligibleFavs.take((amount * 0.35).round()));
+      pickedFamiliar.addAll(eligibleFavs.take((amount * 0.25).round()));
     }
 
-    // 7. Filter candidate tracks
+    // 8. Filter candidate tracks
     final candidateSet = <Track>[];
     final seenKeys = <String>{};
 
-    for (final tr in candidates) {
+    for (final tr in rawCandidates) {
       if (!tr.hasPlayableUrl) continue;
       final k = store.makeTrackKey(tr.artist, tr.title);
       if (k.isEmpty || seenKeys.contains(k)) continue;
@@ -487,90 +704,136 @@ class WaveGenerator {
       if (await store.isDisliked(k)) continue;
       if (await store.skipCount(k) >= 3) continue;
 
+      // In discovery mode, filter out tracks user already has in favorites
+      if (mode == WaveMode.exploration &&
+          userFavorites.any((fav) => store.makeTrackKey(fav.artist, fav.title) == k)) {
+        continue;
+      }
+
       seenKeys.add(k);
       candidateSet.add(tr);
     }
 
-    // If candidates are scarce, try fallback or cold start
     if (candidateSet.isEmpty && pickedFamiliar.isEmpty) {
       return generateColdStart(amount);
     }
 
-    // 8. Score candidates based on ARTIST AFFINITY & PREFERENCES (NOT title words!)
+    // 9. Multi-factor scoring formula:
+    // Affinity + Similarity + Mode Novelty - Skips - Session Skips + Jitter
     final topArtistsSet = rankedArtists.take(10).toSet();
+    final kindredSet = kindredArtists.map(canonicalArtist).toSet();
     final scored = <MapEntry<Track, double>>[];
+
     for (final track in candidateSet) {
       var score = 0.0;
       final a = canonicalArtist(track.artist);
+
+      // Core artist affinity
       if (a.isNotEmpty && topArtistsSet.contains(a)) {
+        score += 6.0;
+      }
+
+      // Kindred / similar artist bonus
+      if (a.isNotEmpty && kindredSet.contains(a)) {
         score += 5.0;
       }
-      if (seedArtist.isNotEmpty && a == seedArtist) {
-        score += 3.0;
+
+      // Session steering penalty: if artist was skipped in current session, heavily penalize
+      if (store.sessionSkippedArtists.contains(a)) {
+        score -= 8.0;
       }
+
+      // Lifetime skips penalty
       final k = store.makeTrackKey(track.artist, track.title);
       final skips = await store.skipCount(k);
-      score -= skips * 2.0;
+      score -= skips * 2.5;
 
-      // Subtle jitter to keep stream varied
+      // Subtle jitter to prevent deterministic repeats
       score += _random.nextDouble() * 2.0;
+
       scored.add(MapEntry(track, score));
     }
 
     scored.sort((a, b) => b.value.compareTo(a.value));
+    final rankedCandidates = scored.map((e) => e.key).toList();
 
-    // 9. Mix familiar + recommended tracks with consecutive artist limiting
-    final resultList = <Track>[];
-    final artistCount = <String, int>{};
+    // 10. Interleave familiar and discovery tracks with anti-fatigue
+    final combined = <Track>[];
+    var favIdx = 0;
+    var candIdx = 0;
 
-    bool canAdd(Track tr) {
-      final a = canonicalArtist(tr.artist);
-      final count = artistCount[a] ?? 0;
-      if (a.isNotEmpty && count >= 2) return false;
-      resultList.add(tr);
-      artistCount[a] = count + 1;
-      final k = store.makeTrackKey(tr.artist, tr.title);
-      _sessionPlayedKeys.add(k);
-      return true;
-    }
-
-    // Interleave familiar and recommendations
-    var favIndex = 0;
-    var recIndex = 0;
-    while (resultList.length < amount && (favIndex < pickedFamiliar.length || recIndex < scored.length)) {
-      if (favIndex < pickedFamiliar.length && (resultList.length % 3 == 0 || recIndex >= scored.length)) {
-        canAdd(pickedFamiliar[favIndex++]);
-      } else if (recIndex < scored.length) {
-        canAdd(scored[recIndex++].key);
+    while (combined.length < amount * 2 &&
+        (favIdx < pickedFamiliar.length || candIdx < rankedCandidates.length)) {
+      if (favIdx < pickedFamiliar.length &&
+          (combined.length % 4 == 0 || candIdx >= rankedCandidates.length)) {
+        combined.add(pickedFamiliar[favIdx++]);
+      } else if (candIdx < rankedCandidates.length) {
+        combined.add(rankedCandidates[candIdx++]);
       } else {
         break;
       }
     }
 
+    final finalResult = _enforceAntiFatigue(combined, amount);
+    for (final t in finalResult) {
+      _sessionPlayedKeys.add(store.makeTrackKey(t.artist, t.title));
+    }
+
+    if (finalResult.isNotEmpty) {
+      return finalResult;
+    }
+    return generateColdStart(amount);
+  }
+
+  /// Enforces anti-fatigue rules:
+  /// 1. No consecutive tracks by the same artist (minimum gap >= 3).
+  /// 2. Max 2 tracks per artist in the batch.
+  List<Track> _enforceAntiFatigue(List<Track> tracks, int amount) {
+    final result = <Track>[];
+    final artistCount = <String, int>{};
+    final artistLastIndex = <String, int>{};
+
+    for (final tr in tracks) {
+      if (result.length >= amount) break;
+      final a = canonicalArtist(tr.artist);
+      final count = artistCount[a] ?? 0;
+      if (a.isNotEmpty && count >= 2) continue;
+
+      final lastIdx = artistLastIndex[a];
+      if (lastIdx != null && (result.length - lastIdx) < 3) {
+        continue; // Too close to previous track by this artist
+      }
+
+      result.add(tr);
+      artistCount[a] = count + 1;
+      artistLastIndex[a] = result.length - 1;
+    }
+
     // Fill remaining if needed
-    for (final e in scored) {
-      if (resultList.length >= amount) break;
-      final k = store.makeTrackKey(e.key.artist, e.key.title);
-      if (!_sessionPlayedKeys.contains(k)) {
-        resultList.add(e.key);
-        _sessionPlayedKeys.add(k);
+    if (result.length < amount) {
+      for (final tr in tracks) {
+        if (result.length >= amount) break;
+        if (!result.contains(tr)) {
+          final a = canonicalArtist(tr.artist);
+          if (result.isNotEmpty && canonicalArtist(result.last.artist) == a) {
+            continue;
+          }
+          result.add(tr);
+        }
       }
     }
 
-    if (resultList.isNotEmpty) {
-      return resultList;
-    }
-    return generateColdStart(amount);
+    return result;
   }
 
   Future<List<Track>> generateColdStart(int amount) async {
     const popularQueries = [
       'топ чарт хиты',
-      'популярная музыка',
-      'новинки недели',
+      'популярная музыка новинки',
+      'русские хиты недели',
+      'топ треки',
     ];
 
-    // Fetch popular in parallel
     final results = await Future.wait(
       popularQueries.map((q) => _safeSearch(q, 'yandex')),
     ).timeout(
@@ -585,7 +848,11 @@ class WaveGenerator {
 
     final valid = candidates.where((t) => t.hasPlayableUrl).toList();
     valid.shuffle(_random);
-    return valid.take(amount).toList();
+    final result = _enforceAntiFatigue(valid, amount);
+    for (final t in result) {
+      _sessionPlayedKeys.add(store.makeTrackKey(t.artist, t.title));
+    }
+    return result;
   }
 
   Future<List<Track>> _safeSearch(String query, String service) async {
@@ -593,7 +860,7 @@ class WaveGenerator {
       final res = await musicService.search(
         service: service,
         query: query,
-        limit: 20,
+        limit: 25,
       );
       return res.tracks;
     } catch (_) {
@@ -619,13 +886,16 @@ class WaveController extends ChangeNotifier {
 
   bool isRunning = false;
   bool isLoading = false;
-  String statusMessage = 'Моя Волна готова';
+  String statusMessage = 'Моя Волна готова к запуску';
   WaveMode mode = WaveMode.flow;
   Track? lastPlayedTrack;
   DateTime? _currentTrackStartTime;
 
+  /// Starts Моя Волна.
+  ///
+  /// CRITICAL: Independent of whatever playlist was playing before!
+  /// Recommendations are generated purely from the user's taste profile.
   Future<void> startWave({
-    Track? seedTrack,
     required PlayerController playerController,
   }) async {
     if (isLoading) return;
@@ -637,8 +907,6 @@ class WaveController extends ChangeNotifier {
 
     try {
       final tracks = await generator.generate(
-        seedArtistRaw: seedTrack?.artist,
-        seedTitleRaw: seedTrack?.title,
         amount: 30,
         mode: mode,
       );
@@ -651,11 +919,12 @@ class WaveController extends ChangeNotifier {
         return;
       }
 
-      statusMessage = 'Волна активна';
+      statusMessage = 'Волна в эфире';
       isLoading = false;
       notifyListeners();
 
-      await playerController.playTracks(tracks, startIndex: 0);
+      // Launch playback strictly as Wave (isWave: true)
+      await playerController.playTracks(tracks, startIndex: 0, isWave: true);
       _onTrackStarted(playerController.currentTrack);
     } catch (e) {
       statusMessage = 'Ошибка запуска: $e';
@@ -666,39 +935,33 @@ class WaveController extends ChangeNotifier {
   }
 
   void onPlayerTick(PlayerController playerController) {
-    if (!isRunning) return;
+    if (!isRunning || !playerController.isWavePlayback) return;
 
-    // Check track transitions
+    // Monitor track transitions
     final current = playerController.currentTrack;
     if (current != null && current.id != lastPlayedTrack?.id) {
       _handleTrackChanged(lastPlayedTrack, current);
     }
 
-    // Auto-load next batch if queue remaining count <= 4
+    // Auto-load next batch when queue remaining count <= 4
     if (!isLoading && playerController.remainingTracksCount <= 4) {
       loadMore(playerController);
     }
   }
 
   Future<void> loadMore(PlayerController playerController) async {
-    if (isLoading || !isRunning) return;
+    if (isLoading || !isRunning || !playerController.isWavePlayback) return;
 
     isLoading = true;
     notifyListeners();
 
     try {
-      final lastTrack = playerController.queue.isNotEmpty
-          ? playerController.queue.last
-          : null;
-
       final moreTracks = await generator.generate(
-        seedArtistRaw: lastTrack?.artist,
-        seedTitleRaw: lastTrack?.title,
         amount: 20,
         mode: mode,
       );
 
-      if (moreTracks.isNotEmpty) {
+      if (moreTracks.isNotEmpty && isRunning && playerController.isWavePlayback) {
         playerController.appendTracks(moreTracks);
       }
     } catch (_) {}
@@ -720,11 +983,15 @@ class WaveController extends ChangeNotifier {
   void _handleTrackChanged(Track? previous, Track? current) {
     if (previous != null && _currentTrackStartTime != null) {
       final elapsed = DateTime.now().difference(_currentTrackStartTime!);
-      // If skipped within 15 seconds, penalize
+
+      // If skipped within 15 seconds, penalize artist and track
       if (elapsed.inSeconds < 15) {
         final key = store.makeTrackKey(previous.artist, previous.title);
         store.markSkipped(key);
         store.onSkipTrack(previous.artist);
+      } else if (elapsed.inSeconds >= 30) {
+        // High engagement: listened through
+        store.onCompletedListen(previous.artist);
       }
     }
     _onTrackStarted(current);
@@ -738,10 +1005,9 @@ class WaveController extends ChangeNotifier {
     await store.markDisliked(key);
     await store.onDislikeTrack(track.artist);
 
-    // Skip and remove from current playlist
+    // Skip and remove from current queue
     await playerController.removeTrackAndSkip(track.id);
 
-    // Trigger load more if queue dropped low
     if (playerController.remainingTracksCount <= 4) {
       await loadMore(playerController);
     }
@@ -761,6 +1027,7 @@ class WaveController extends ChangeNotifier {
   }
 
   void stopWave() {
+    if (!isRunning) return;
     isRunning = false;
     statusMessage = 'Моя Волна остановлена';
     notifyListeners();
@@ -771,24 +1038,21 @@ class WaveController extends ChangeNotifier {
     mode = newMode;
     notifyListeners();
 
-    if (isRunning && playerController != null) {
+    if (isRunning && playerController != null && playerController.isWavePlayback) {
       isLoading = true;
       statusMessage = 'Переключаем волну...';
       notifyListeners();
 
       try {
-        final current = playerController.currentTrack;
         final tracks = await generator.generate(
-          seedArtistRaw: current?.artist,
-          seedTitleRaw: current?.title,
           amount: 25,
           mode: mode,
         );
 
         if (tracks.isNotEmpty) {
-          await playerController.playTracks(tracks, startIndex: 0);
+          await playerController.playTracks(tracks, startIndex: 0, isWave: true);
           _onTrackStarted(playerController.currentTrack);
-          statusMessage = 'Волна активна';
+          statusMessage = 'Волна в эфире';
         }
       } catch (_) {}
 

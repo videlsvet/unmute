@@ -176,4 +176,34 @@ class AuthService {
 
     return preview;
   }
+
+  Future<List<Track>> getMyWave({
+    required String token,
+    String service = 'yandex',
+    String mode = 'flow',
+    int limit = 36,
+  }) async {
+    final response = await postJson(Uri.parse(AppConfig.authBaseUrl), {
+      'action': 'my_wave',
+      'token': token,
+      'service': service,
+      'mode': mode,
+      'limit': limit,
+    });
+
+    final data = jsonDecode(response.body);
+    if (response.statusCode != 200) {
+      throw Exception((data['error'] ?? 'Wave error').toString());
+    }
+
+    final tracksRaw = data is Map
+        ? (data['tracks'] as List? ?? const [])
+        : (data is List ? data : const []);
+
+    return tracksRaw
+        .whereType<Map>()
+        .map((e) => Track.fromJson(Map<String, dynamic>.from(e)))
+        .where((t) => (t.error ?? '').isEmpty && t.hasPlayableUrl)
+        .toList();
+  }
 }
