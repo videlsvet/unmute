@@ -18,8 +18,9 @@ import MediaPlayer
 
   func didInitializeImplicitFlutterEngine(_ engineBridge: FlutterImplicitEngineBridge) {
     GeneratedPluginRegistrant.register(with: engineBridge.pluginRegistry)
-    let registrar = engineBridge.pluginRegistry.registrar(forPlugin: "UnmuteNowPlaying")
-    setupMethodChannel(messenger: registrar.messenger())
+    if let registrar = engineBridge.pluginRegistry.registrar(forPlugin: "UnmuteNowPlaying") {
+      setupMethodChannel(messenger: registrar.messenger())
+    }
   }
 
   private func setupAudioSession() {
@@ -33,7 +34,7 @@ import MediaPlayer
 
   private func setupMethodChannel(messenger: FlutterBinaryMessenger) {
     nowPlayingChannel = FlutterMethodChannel(name: "unmute/now_playing", binaryMessenger: messenger)
-    nowPlayingChannel?.setMethodCallHandler { [weak self] (call, result) in
+    nowPlayingChannel?.setMethodCallHandler { [weak self] (call: FlutterMethodCall, result: @escaping FlutterResult) in
       if call.method == "updateNowPlaying" {
         if let args = call.arguments as? [String: Any] {
           self?.updateNowPlayingInfo(args: args)
@@ -69,7 +70,7 @@ import MediaPlayer
            let image = UIImage(data: data) {
           DispatchQueue.main.async {
             var currentInfo = MPNowPlayingInfoCenter.default().nowPlayingInfo ?? [:]
-            let artwork = MPMediaItemArtwork(boundsSize: image.size) { _ in image }
+            let artwork = MPMediaItemArtwork(boundsSize: image.size, requestHandler: { _ in image })
             currentInfo[MPMediaItemPropertyArtwork] = artwork
             MPNowPlayingInfoCenter.default().nowPlayingInfo = currentInfo
           }
@@ -84,42 +85,42 @@ import MediaPlayer
     let center = MPRemoteCommandCenter.shared()
 
     center.playCommand.isEnabled = true
-    center.playCommand.addTarget { [weak self] _ in
+    _ = center.playCommand.addTarget(handler: { [weak self] _ in
       self?.nowPlayingChannel?.invokeMethod("play", arguments: nil)
-      return .success
-    }
+      return MPRemoteCommandHandlerStatus.success
+    })
 
     center.pauseCommand.isEnabled = true
-    center.pauseCommand.addTarget { [weak self] _ in
+    _ = center.pauseCommand.addTarget(handler: { [weak self] _ in
       self?.nowPlayingChannel?.invokeMethod("pause", arguments: nil)
-      return .success
-    }
+      return MPRemoteCommandHandlerStatus.success
+    })
 
     center.togglePlayPauseCommand.isEnabled = true
-    center.togglePlayPauseCommand.addTarget { [weak self] _ in
+    _ = center.togglePlayPauseCommand.addTarget(handler: { [weak self] _ in
       self?.nowPlayingChannel?.invokeMethod("togglePlayPause", arguments: nil)
-      return .success
-    }
+      return MPRemoteCommandHandlerStatus.success
+    })
 
     center.nextTrackCommand.isEnabled = true
-    center.nextTrackCommand.addTarget { [weak self] _ in
+    _ = center.nextTrackCommand.addTarget(handler: { [weak self] _ in
       self?.nowPlayingChannel?.invokeMethod("next", arguments: nil)
-      return .success
-    }
+      return MPRemoteCommandHandlerStatus.success
+    })
 
     center.previousTrackCommand.isEnabled = true
-    center.previousTrackCommand.addTarget { [weak self] _ in
+    _ = center.previousTrackCommand.addTarget(handler: { [weak self] _ in
       self?.nowPlayingChannel?.invokeMethod("previous", arguments: nil)
-      return .success
-    }
+      return MPRemoteCommandHandlerStatus.success
+    })
 
     center.changePlaybackPositionCommand.isEnabled = true
-    center.changePlaybackPositionCommand.addTarget { [weak self] event in
+    _ = center.changePlaybackPositionCommand.addTarget(handler: { [weak self] (event: MPRemoteCommandEvent) in
       if let posEvent = event as? MPChangePlaybackPositionCommandEvent {
         self?.nowPlayingChannel?.invokeMethod("seek", arguments: ["position": posEvent.positionTime])
-        return .success
+        return MPRemoteCommandHandlerStatus.success
       }
-      return .commandFailed
-    }
+      return MPRemoteCommandHandlerStatus.commandFailed
+    })
   }
 }
