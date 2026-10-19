@@ -21,6 +21,7 @@ import '../theme/app_theme.dart';
 import '../widgets/app_sidebar.dart';
 import '../widgets/player_bar.dart';
 import '../widgets/premium_components.dart';
+import '../widgets/ui_kit.dart';
 import 'home_page.dart';
 
 enum AppSection {

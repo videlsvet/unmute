@@ -61,8 +61,6 @@ class _WavePageState extends State<WavePage> {
 
   @override
   Widget build(BuildContext context) {
-    final isMobile = MediaQuery.sizeOf(context).width < 720;
-
     return AnimatedBuilder(
       animation: Listenable.merge([widget.waveController, widget.playerController]),
       builder: (context, _) {

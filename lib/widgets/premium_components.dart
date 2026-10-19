@@ -865,25 +865,3 @@ class _TrackArtists extends StatelessWidget {
     );
   }
 }
-
-class _Glow extends StatelessWidget {
-  const _Glow({required this.size, required this.color});
-
-  final double size;
-  final Color color;
-
-  @override
-  Widget build(BuildContext context) {
-    return IgnorePointer(
-      child: Container(
-        width: size,
-        height: size,
-        decoration: BoxDecoration(
-          shape: BoxShape.circle,
-          color: color,
-          boxShadow: [BoxShadow(color: color, blurRadius: size * 0.35)],
-        ),
-      ),
-    );
-  }
-}
