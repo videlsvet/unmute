@@ -3,27 +3,27 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 
 class AppTheme {
-  static const Color background = Color(0xFF050506);
-  static const Color backgroundElevated = Color(0xFF0A0A0C);
-  static const Color surface = Color(0xFF101013);
-  static const Color surfaceSoft = Color(0xFF151519);
-  static const Color surfaceMuted = Color(0xFF1C1B21);
-  static const Color surfaceRaised = Color(0xFF222027);
-  static const Color surfaceHighest = Color(0xFF2A2228);
-  static const Color stroke = Color(0xFF2C2A31);
-  static const Color strokeSoft = Color(0xFF44343A);
-  static const Color accent = Color(0xFFE51B2D);
-  static const Color accent2 = Color(0xFFFF3F4F);
-  static const Color accentWarm = Color(0xFFFF6A3D);
-  static const Color textPrimary = Color(0xFFF7F7F8);
-  static const Color textSecondary = Color(0xFFC4C0C5);
-  static const Color textMuted = Color(0xFF858089);
-  static const Color danger = Color(0xFFFF5C70);
+  static const Color background = Color(0xFF000000);
+  static const Color backgroundElevated = Color(0xFF090909);
+  static const Color surface = Color(0xFF121212);
+  static const Color surfaceSoft = Color(0xFF181818);
+  static const Color surfaceMuted = Color(0xFF242424);
+  static const Color surfaceRaised = Color(0xFF303030);
+  static const Color surfaceHighest = Color(0xFF383838);
+  static const Color stroke = Color(0xFF282828);
+  static const Color strokeSoft = Color(0xFF3A3A3A);
+  static const Color accent = Color(0xFF1ED760);
+  static const Color accent2 = Color(0xFF1ED760);
+  static const Color accentWarm = Color(0xFF1DB954);
+  static const Color textPrimary = Color(0xFFFFFFFF);
+  static const Color textSecondary = Color(0xFFB3B3B3);
+  static const Color textMuted = Color(0xFF7A7A7A);
+  static const Color danger = Color(0xFFFF5A5F);
 
-  static const double radiusSm = 10;
-  static const double radiusMd = 14;
-  static const double radiusLg = 18;
-  static const double radiusXl = 24;
+  static const double radiusSm = 6;
+  static const double radiusMd = 10;
+  static const double radiusLg = 14;
+  static const double radiusXl = 18;
 
   static List<BoxShadow> premiumShadow({Color? color, double alpha = 0.18}) {
     return [
@@ -57,7 +57,7 @@ class AppTheme {
       hoverColor: accent.withValues(alpha: 0.05),
       focusColor: accent.withValues(alpha: 0.08),
       highlightColor: accent.withValues(alpha: 0.06),
-      splashFactory: InkSparkle.splashFactory,
+      splashFactory: InkRipple.splashFactory,
     );
 
     return base.copyWith(
@@ -139,8 +139,7 @@ class AppTheme {
         margin: EdgeInsets.zero,
         elevation: 0,
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(radiusXl),
-          side: const BorderSide(color: stroke),
+          borderRadius: BorderRadius.circular(radiusLg),
         ),
       ),
       dividerTheme: const DividerThemeData(

@@ -159,6 +159,12 @@ class _ArtistPageState extends State<ArtistPage> {
     }
   }
 
+  void _playShuffled(List<Track> tracks) {
+    if (tracks.isEmpty) return;
+    final shuffled = List<Track>.from(tracks)..shuffle();
+    widget.playerController.playTracks(shuffled, startIndex: 0);
+  }
+
   @override
   Widget build(BuildContext context) {
     if (_loading) {
@@ -184,6 +190,93 @@ class _ArtistPageState extends State<ArtistPage> {
         title: 'Артист не найден',
         subtitle: 'Источник не вернул данные по этому артисту.',
         icon: Icons.mic_external_off_rounded,
+      );
+    }
+
+    final isMobile = MediaQuery.sizeOf(context).width < 720;
+
+    if (isMobile) {
+      return AnimatedBuilder(
+        animation: widget.playerController,
+        builder: (context, _) {
+          final isPlaying = widget.playerController.isPlaying &&
+              widget.playerController.currentTrack != null &&
+              result.tracks.any(
+                (t) => t.id == widget.playerController.currentTrack?.id,
+              );
+
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _MobileArtistHeader(
+                result: result,
+                isPlaying: isPlaying,
+                onBack: _handleBack,
+                onPlay: result.tracks.isEmpty
+                    ? null
+                    : () {
+                        if (isPlaying) {
+                          widget.playerController.togglePlayPause();
+                        } else {
+                          widget.playerController.playTracks(
+                            result.tracks,
+                            startIndex: 0,
+                          );
+                        }
+                      },
+                onShuffle: result.tracks.isEmpty
+                    ? null
+                    : () => _playShuffled(result.tracks),
+              ),
+              const Padding(
+                padding: EdgeInsets.fromLTRB(16, 14, 16, 8),
+                child: Text(
+                  'Популярные треки',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w700,
+                    color: Colors.white,
+                  ),
+                ),
+              ),
+              Expanded(
+                child: result.tracks.isEmpty
+                    ? const EmptyStateWidget(
+                        title: 'Треки не найдены',
+                        subtitle:
+                            'Источник не вернул доступных треков для этого артиста.',
+                        icon: Icons.music_off_rounded,
+                      )
+                    : ListView.separated(
+                        padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
+                        itemCount: result.tracks.length,
+                        separatorBuilder: (_, __) => const SizedBox(height: 4),
+                        itemBuilder: (context, index) {
+                          final track = result.tracks[index];
+                          final canOpenAlbum = widget.onOpenAlbum != null &&
+                              (track.albumId ?? '').trim().isNotEmpty;
+                          return _MobileArtistTrackRow(
+                            track: track,
+                            isCurrent: widget.playerController.currentTrack?.id ==
+                                track.id,
+                            isFavorite: _favoriteIds.contains(track.id),
+                            onPlay: track.hasPlayableUrl
+                                ? () => widget.playerController.playTracks(
+                                      result.tracks,
+                                      startIndex: index,
+                                    )
+                                : null,
+                            onFavorite: () => _toggleFavorite(track),
+                            onPlaylist: () => _addToPlaylist(track),
+                            onAlbum:
+                                canOpenAlbum ? () => _openAlbum(track) : null,
+                          );
+                        },
+                      ),
+              ),
+            ],
+          );
+        },
       );
     }
 
@@ -279,6 +372,348 @@ class _ArtistPageState extends State<ArtistPage> {
   }
 }
 
+class _MobileArtistHeader extends StatelessWidget {
+  const _MobileArtistHeader({
+    required this.result,
+    required this.isPlaying,
+    required this.onBack,
+    required this.onPlay,
+    required this.onShuffle,
+  });
+
+  final ArtistResult result;
+  final bool isPlaying;
+  final VoidCallback onBack;
+  final VoidCallback? onPlay;
+  final VoidCallback? onShuffle;
+
+  Widget _buildFallback() {
+    return Container(
+      color: AppTheme.surfaceMuted,
+      child: const Center(
+        child: BrandMark(size: 72, padding: 14, glow: false),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        SizedBox(
+          height: 240,
+          width: double.infinity,
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              if ((result.image ?? '').trim().isNotEmpty)
+                Image.network(
+                  result.image!,
+                  fit: BoxFit.cover,
+                  errorBuilder: (_, __, ___) => _buildFallback(),
+                )
+              else
+                _buildFallback(),
+              DecoratedBox(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [
+                      Colors.black.withValues(alpha: 0.4),
+                      Colors.transparent,
+                      Colors.black.withValues(alpha: 0.65),
+                      Colors.black.withValues(alpha: 0.95),
+                    ],
+                    stops: const [0.0, 0.35, 0.72, 1.0],
+                  ),
+                ),
+              ),
+              Positioned(
+                top: 12,
+                left: 12,
+                child: Material(
+                  color: Colors.black.withValues(alpha: 0.45),
+                  shape: const CircleBorder(),
+                  child: InkWell(
+                    customBorder: const CircleBorder(),
+                    onTap: onBack,
+                    child: const SizedBox(
+                      width: 40,
+                      height: 40,
+                      child: Icon(
+                        Icons.chevron_left_rounded,
+                        color: Colors.white,
+                        size: 28,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+              Positioned(
+                left: 16,
+                right: 16,
+                bottom: 12,
+                child: Text(
+                  result.name,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 28,
+                    fontWeight: FontWeight.w900,
+                    letterSpacing: -0.6,
+                    height: 1.12,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 6),
+          child: Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      '${result.tracks.length} треков',
+                      style: const TextStyle(
+                        color: AppTheme.textSecondary,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    if (result.source.trim().isNotEmpty) ...[
+                      const SizedBox(height: 2),
+                      Text(
+                        result.source,
+                        style: TextStyle(
+                          color: AppTheme.textSecondary.withValues(alpha: 0.7),
+                          fontSize: 11,
+                          fontWeight: FontWeight.w400,
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+              IconButton(
+                icon: const Icon(Icons.shuffle_rounded),
+                color: Colors.white70,
+                iconSize: 26,
+                tooltip: 'Перемешать',
+                onPressed: onShuffle,
+              ),
+              const SizedBox(width: 8),
+              Material(
+                color: AppTheme.accent,
+                shape: const CircleBorder(),
+                elevation: 6,
+                shadowColor: AppTheme.accent.withValues(alpha: 0.35),
+                child: InkWell(
+                  customBorder: const CircleBorder(),
+                  onTap: onPlay,
+                  child: SizedBox(
+                    width: 48,
+                    height: 48,
+                    child: Icon(
+                      isPlaying
+                          ? Icons.pause_rounded
+                          : Icons.play_arrow_rounded,
+                      color: Colors.black,
+                      size: 28,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _MobileArtistTrackRow extends StatelessWidget {
+  const _MobileArtistTrackRow({
+    required this.track,
+    required this.isCurrent,
+    required this.isFavorite,
+    required this.onPlay,
+    required this.onFavorite,
+    required this.onPlaylist,
+    this.onAlbum,
+  });
+
+  final Track track;
+  final bool isCurrent;
+  final bool isFavorite;
+  final VoidCallback? onPlay;
+  final VoidCallback onFavorite;
+  final VoidCallback onPlaylist;
+  final VoidCallback? onAlbum;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(8),
+        onTap: onPlay,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 4),
+          child: Row(
+            children: [
+              ClipRRect(
+                borderRadius: BorderRadius.circular(6),
+                child: SizedBox(
+                  width: 40,
+                  height: 40,
+                  child: (track.image ?? '').trim().isEmpty
+                      ? Container(
+                          color: AppTheme.surfaceMuted,
+                          child: const Icon(
+                            Icons.music_note_rounded,
+                            color: Colors.white60,
+                            size: 20,
+                          ),
+                        )
+                      : Image.network(
+                          track.image!,
+                          fit: BoxFit.cover,
+                          errorBuilder: (_, __, ___) => Container(
+                            color: AppTheme.surfaceMuted,
+                            child: const Icon(
+                              Icons.music_note_rounded,
+                              color: Colors.white60,
+                              size: 20,
+                            ),
+                          ),
+                        ),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      track.title,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        color: isCurrent
+                            ? AppTheme.accent
+                            : (track.hasPlayableUrl
+                                ? Colors.white
+                                : Colors.white54),
+                        fontSize: 14.5,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(height: 3),
+                    Text(
+                      track.artist,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: AppTheme.textSecondary,
+                        fontSize: 12.5,
+                        fontWeight: FontWeight.w400,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
+              IconButton(
+                icon: Icon(
+                  isFavorite
+                      ? Icons.favorite_rounded
+                      : Icons.favorite_border_rounded,
+                  color: isFavorite ? AppTheme.accent : Colors.white60,
+                  size: 20,
+                ),
+                splashRadius: 20,
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+                tooltip:
+                    isFavorite ? 'Удалить из избранного' : 'В избранное',
+                onPressed: onFavorite,
+              ),
+              PopupMenuButton<String>(
+                icon: const Icon(
+                  Icons.more_vert_rounded,
+                  color: Colors.white60,
+                  size: 20,
+                ),
+                splashRadius: 20,
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+                tooltip: 'Ещё',
+                color: AppTheme.surfaceRaised,
+                elevation: 8,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  side: BorderSide(
+                    color: Colors.white.withValues(alpha: 0.08),
+                  ),
+                ),
+                onSelected: (value) {
+                  if (value == 'playlist') {
+                    onPlaylist();
+                  } else if (value == 'album') {
+                    onAlbum?.call();
+                  }
+                },
+                itemBuilder: (context) => [
+                  const PopupMenuItem<String>(
+                    value: 'playlist',
+                    child: Row(
+                      children: [
+                        Icon(Icons.playlist_add_rounded,
+                            size: 20, color: Colors.white),
+                        SizedBox(width: 12),
+                        Text(
+                          'Добавить в плейлист',
+                          style: TextStyle(color: Colors.white, fontSize: 13.5),
+                        ),
+                      ],
+                    ),
+                  ),
+                  if (onAlbum != null)
+                    const PopupMenuItem<String>(
+                      value: 'album',
+                      child: Row(
+                        children: [
+                          Icon(Icons.album_outlined,
+                              size: 20, color: Colors.white),
+                          SizedBox(width: 12),
+                          Text(
+                            'Открыть альбом',
+                            style:
+                                TextStyle(color: Colors.white, fontSize: 13.5),
+                          ),
+                        ],
+                      ),
+                    ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class _ArtistHero extends StatelessWidget {
   const _ArtistHero({
     required this.result,
@@ -294,78 +729,47 @@ class _ArtistHero extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(24),
-      decoration: BoxDecoration(
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(AppTheme.radiusXl)),
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [
-            AppTheme.accent.withValues(alpha: 0.24),
-            AppTheme.surfaceRaised.withValues(alpha: 0.9),
-            AppTheme.surface.withValues(alpha: 0.96),
-          ],
-        ),
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.end,
+    return LayoutBuilder(builder: (context, constraints) {
+      final compact = constraints.maxWidth < 600;
+      final details = Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
         children: [
-          _BackButton(onPressed: onBack),
-          const SizedBox(width: 16),
-          _ArtistAvatar(imageUrl: result.image, radius: 82),
-          const SizedBox(width: 22),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text('Artist', style: Theme.of(context).textTheme.labelMedium),
-                const SizedBox(height: 8),
-                Text(
-                  result.name,
-                  style: Theme.of(context).textTheme.displayLarge,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                const SizedBox(height: 12),
-                Wrap(
-                  spacing: 10,
-                  runSpacing: 10,
-                  children: [
-                    _SourceBadge(source: result.source),
-                    _InfoPill('${result.tracks.length} треков'),
-                    const _InfoPill('Top tracks'),
-                  ],
-                ),
-                const SizedBox(height: 18),
-                Wrap(
-                  spacing: 10,
-                  runSpacing: 10,
-                  children: [
-                    ElevatedButton.icon(
-                      onPressed: onPlay,
-                      icon: const Icon(Icons.play_arrow_rounded),
-                      label: const Text('Слушать'),
-                    ),
-                    OutlinedButton.icon(
-                      onPressed: onRefresh,
-                      icon: const Icon(Icons.refresh_rounded),
-                      label: const Text('Обновить'),
-                    ),
-                    OutlinedButton.icon(
-                      onPressed: () {},
-                      icon: const Icon(Icons.favorite_border_rounded),
-                      label: const Text('Подписаться'),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
+          Text('ИСПОЛНИТЕЛЬ', style: Theme.of(context).textTheme.labelMedium?.copyWith(letterSpacing: 1.4)),
+          const SizedBox(height: 8),
+          Text(result.name, style: compact ? Theme.of(context).textTheme.displaySmall : Theme.of(context).textTheme.displayLarge,
+            maxLines: 2, overflow: TextOverflow.ellipsis),
+          const SizedBox(height: 12),
+          Wrap(spacing: 8, runSpacing: 8, children: [
+            _SourceBadge(source: result.source),
+            _InfoPill('${result.tracks.length} треков'),
+          ]),
+          const SizedBox(height: 18),
+          Wrap(spacing: 10, runSpacing: 10, children: [
+            ElevatedButton.icon(onPressed: onPlay, icon: const Icon(Icons.play_arrow_rounded), label: const Text('Слушать')),
+            OutlinedButton.icon(onPressed: onRefresh, icon: const Icon(Icons.refresh_rounded), label: const Text('Обновить')),
+          ]),
         ],
-      ),
-    );
+      );
+      return Container(
+        padding: EdgeInsets.all(compact ? 18 : 24),
+        decoration: const BoxDecoration(color: AppTheme.surface),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          _BackButton(onPressed: onBack),
+          SizedBox(height: compact ? 18 : 10),
+          if (compact) ...[
+            Center(child: _ArtistAvatar(imageUrl: result.image, radius: 76)),
+            const SizedBox(height: 22),
+            details,
+          ] else
+            Row(crossAxisAlignment: CrossAxisAlignment.end, children: [
+              _ArtistAvatar(imageUrl: result.image, radius: 82),
+              const SizedBox(width: 24),
+              Expanded(child: details),
+            ]),
+        ]),
+      );
+    });
   }
 }
 

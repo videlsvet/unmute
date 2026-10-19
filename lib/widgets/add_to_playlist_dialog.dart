@@ -162,9 +162,10 @@ class _AddToPlaylistDialogState extends State<AddToPlaylistDialog> {
   Widget build(BuildContext context) {
     return AlertDialog(
       backgroundColor: const Color(0xFF131722),
-      title: const Text('Добавить в плейлист'),
       content: SizedBox(
-        width: 520,
+        width: MediaQuery.sizeOf(context).width < 560
+            ? double.maxFinite
+            : 520,
         child: _loading
             ? const SizedBox(
                 height: 160,

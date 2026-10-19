@@ -57,23 +57,7 @@ class _DynamicGradientBackgroundState extends State<DynamicGradientBackground> {
       builder: (context, snapshot) {
         final accentColor = snapshot.data ?? widget.accent;
         return DecoratedBox(
-          decoration: BoxDecoration(
-            gradient: RadialGradient(
-              center: const Alignment(-0.62, -0.72),
-              radius: 1.18,
-              colors: [
-                accentColor.withValues(alpha: 0.28),
-                Color.lerp(
-                      AppTheme.backgroundElevated,
-                      accentColor,
-                      0.12,
-                    )!
-                    .withValues(alpha: 0.96),
-                AppTheme.background,
-              ],
-              stops: const [0, 0.42, 1],
-            ),
-          ),
+        decoration: BoxDecoration(color: AppTheme.background),
           child: Stack(
             children: [
               if ((widget.artwork ?? '').trim().isNotEmpty)
@@ -96,20 +80,6 @@ class _DynamicGradientBackgroundState extends State<DynamicGradientBackground> {
                     ),
                   ),
                 ),
-              Positioned(
-                top: -170,
-                right: -120,
-                child: _Glow(size: 430, color: accentColor.withValues(alpha: 0.2)),
-              ),
-              Positioned(
-                bottom: -190,
-                left: 280,
-                child: _Glow(
-                  size: 360,
-                  color: Color.lerp(accentColor, AppTheme.accentWarm, 0.35)!
-                      .withValues(alpha: 0.12),
-                ),
-              ),
               widget.child,
             ],
           ),
@@ -145,10 +115,9 @@ class PremiumSurface extends StatelessWidget {
       margin: margin,
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(radius),
-        color: color ?? AppTheme.surface.withValues(alpha: 0.78),
-        border: Border.all(
-            color: borderColor ?? AppTheme.stroke.withValues(alpha: 0.8)),
-        boxShadow: shadow ? AppTheme.premiumShadow(alpha: 0.06) : null,
+        color: color ?? AppTheme.surface,
+        border: borderColor == null ? null : Border.all(color: borderColor!),
+        boxShadow: shadow ? AppTheme.premiumShadow(alpha: 0.04) : null,
       ),
       child: Padding(padding: padding, child: child),
     );
@@ -169,18 +138,11 @@ class GlassSurface extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(radius),
-      child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
-        child: PremiumSurface(
-          radius: radius,
-          padding: padding,
-          color: AppTheme.surfaceSoft.withValues(alpha: 0.7),
-          borderColor: Colors.white.withValues(alpha: 0.06),
-          child: child,
-        ),
-      ),
+    return PremiumSurface(
+      radius: radius,
+      padding: padding,
+      color: AppTheme.surface,
+      child: child,
     );
   }
 }

@@ -8,12 +8,14 @@ import '../../core/models/playlist.dart';
 import '../../core/models/track.dart';
 import '../../core/services/auth_service.dart';
 import '../../core/services/playlist_service.dart';
+import '../../theme/app_theme.dart';
 import '../../widgets/app_header.dart';
 import '../../widgets/empty_state.dart';
 import '../../widgets/error_state.dart';
 import '../../widgets/glass_panel.dart';
 import '../../widgets/service_chip.dart';
 import '../../widgets/track_tile.dart';
+import '../../widgets/ui_kit.dart';
 
 class PlaylistDetailsRedesignPage extends StatefulWidget {
   const PlaylistDetailsRedesignPage({
@@ -125,6 +127,7 @@ class _PlaylistDetailsRedesignPageState
         return StatefulBuilder(
           builder: (context, setLocalState) {
             return AlertDialog(
+              backgroundColor: const Color(0xFF131722),
               title: const Text('Импорт треков текстом'),
               content: SizedBox(
                 width: 520,
@@ -134,6 +137,7 @@ class _PlaylistDetailsRedesignPageState
                     DropdownButton<String>(
                       value: service,
                       isExpanded: true,
+                      dropdownColor: const Color(0xFF1A1F2B),
                       items: const [
                         DropdownMenuItem(
                           value: 'yandex',
@@ -160,8 +164,8 @@ class _PlaylistDetailsRedesignPageState
                     const SizedBox(height: 12),
                     TextField(
                       controller: textController,
-                      minLines: 10,
-                      maxLines: 14,
+                      minLines: 6,
+                      maxLines: 12,
                       decoration: const InputDecoration(
                         hintText: 'Каждый трек с новой строки',
                       ),
@@ -263,8 +267,327 @@ class _PlaylistDetailsRedesignPageState
     );
   }
 
+  Future<void> _playAll() async {
+    if (_tracks.isEmpty || widget.playerController == null) return;
+    final firstPlayable = _tracks.indexWhere((t) => t.hasPlayableUrl);
+    if (firstPlayable >= 0) {
+      await widget.playerController!.playTracks(
+        _tracks,
+        startIndex: firstPlayable,
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
+    final isMobile = MediaQuery.sizeOf(context).width < 720;
+    if (isMobile) {
+      return _buildMobile(context);
+    }
+    return _buildDesktop(context);
+  }
+
+  Widget _buildMobile(BuildContext context) {
+    return Scaffold(
+      backgroundColor: AppTheme.background,
+      body: SafeArea(
+        child: Column(
+          children: [
+            // Top App Bar
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              child: Row(
+                children: [
+                  IconButton(
+                    icon: const Icon(Icons.chevron_left_rounded, size: 30),
+                    onPressed: () {
+                      if (Navigator.of(context).canPop()) {
+                        Navigator.of(context).pop();
+                      }
+                    },
+                  ),
+                  const Spacer(),
+                  IconButton(
+                    icon: const Icon(Icons.upload_file_rounded, size: 22),
+                    tooltip: 'Импорт треков',
+                    onPressed: _importText,
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.refresh_rounded, size: 22),
+                    tooltip: 'Обновить',
+                    onPressed: _load,
+                  ),
+                ],
+              ),
+            ),
+
+            // Main Content
+            Expanded(
+              child: () {
+                if (_loading) {
+                  return const Center(child: CircularProgressIndicator());
+                }
+                if ((_error ?? '').isNotEmpty) {
+                  return ErrorState(message: _error!, onRetry: _load);
+                }
+
+                return ListView(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  children: [
+                    // Centered artwork/icon box
+                    Center(
+                      child: Container(
+                        width: 160,
+                        height: 160,
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(16),
+                          gradient: LinearGradient(
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                            colors: [
+                              AppTheme.accent.withValues(alpha: 0.92),
+                              AppTheme.accent2.withValues(alpha: 0.88),
+                            ],
+                          ),
+                          boxShadow: [
+                            BoxShadow(
+                              color: AppTheme.accent.withValues(alpha: 0.3),
+                              blurRadius: 28,
+                              offset: const Offset(0, 10),
+                            ),
+                          ],
+                        ),
+                        child: const Icon(
+                          Icons.library_music_rounded,
+                          size: 64,
+                          color: Colors.white,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 18),
+
+                    // Title
+                    Text(
+                      widget.playlist.title,
+                      textAlign: TextAlign.center,
+                      style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                            fontWeight: FontWeight.w800,
+                            letterSpacing: -0.3,
+                          ),
+                    ),
+                    const SizedBox(height: 6),
+
+                    // Subtitle
+                    Text(
+                      '${widget.playlist.source.isEmpty ? 'local' : widget.playlist.source} • ${_tracks.length} треков',
+                      textAlign: TextAlign.center,
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                            color: AppTheme.textSecondary,
+                          ),
+                    ),
+                    const SizedBox(height: 16),
+
+                    // Actions Row: Shuffle & Play button
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.end,
+                      children: [
+                        if (widget.playerController != null)
+                          IconButton(
+                            icon: Icon(
+                              Icons.shuffle_rounded,
+                              color: widget.playerController!.shuffleEnabled
+                                  ? AppTheme.accent
+                                  : AppTheme.textSecondary,
+                            ),
+                            onPressed: () {
+                              setState(() {
+                                widget.playerController!.toggleShuffle();
+                              });
+                            },
+                          ),
+                        const SizedBox(width: 8),
+                        Container(
+                          width: 50,
+                          height: 50,
+                          decoration: const BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: AppTheme.accent,
+                          ),
+                          child: IconButton(
+                            icon: const Icon(
+                              Icons.play_arrow_rounded,
+                              size: 32,
+                              color: Colors.white,
+                            ),
+                            onPressed: _tracks.isEmpty ? null : _playAll,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+
+                    // Import progress
+                    if (_progress != null && _progress!.isRunning) ...[
+                      LinearProgressIndicator(
+                        value: _progress!.total <= 0
+                            ? null
+                            : _progress!.done / _progress!.total,
+                        backgroundColor: Colors.white12,
+                        color: AppTheme.accent,
+                      ),
+                      const SizedBox(height: 6),
+                      Text(
+                        'Импорт: ${_progress!.done}/${_progress!.total} • ${_progress!.current}',
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                              color: AppTheme.textSecondary,
+                            ),
+                      ),
+                      const SizedBox(height: 12),
+                    ],
+
+                    // Empty or track list
+                    if (_tracks.isEmpty)
+                      const Padding(
+                        padding: EdgeInsets.symmetric(vertical: 40),
+                        child: EmptyState(
+                          title: 'В плейлисте пока нет треков',
+                          subtitle: 'Добавь их вручную или импортируй текстом.',
+                          icon: Icons.library_music_outlined,
+                        ),
+                      )
+                    else
+                      ...List.generate(_tracks.length, (index) {
+                        final track = _tracks[index];
+                        final isCurrent =
+                            widget.playerController?.currentTrack?.id ==
+                                track.id;
+
+                        return Container(
+                          margin: const EdgeInsets.only(bottom: 8),
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(12),
+                            color: isCurrent
+                                ? AppTheme.accent.withValues(alpha: 0.12)
+                                : Colors.transparent,
+                          ),
+                          child: ListTile(
+                            contentPadding:
+                                const EdgeInsets.symmetric(horizontal: 8),
+                            leading: UnmuteArtwork(
+                              imageUrl: track.image,
+                              size: 44,
+                              radius: 8,
+                            ),
+                            title: Text(
+                              track.title,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                color: isCurrent
+                                    ? AppTheme.accent
+                                    : Colors.white,
+                                fontWeight: isCurrent
+                                    ? FontWeight.w700
+                                    : FontWeight.w500,
+                                fontSize: 14,
+                              ),
+                            ),
+                            subtitle: Text(
+                              track.artist.isEmpty
+                                  ? 'Неизвестный исполнитель'
+                                  : track.artist,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                color: AppTheme.textSecondary,
+                                fontSize: 12,
+                              ),
+                            ),
+                            onTap: widget.playerController != null &&
+                                    track.hasPlayableUrl
+                                ? () => widget.playerController!.playTracks(
+                                      _tracks,
+                                      startIndex: index,
+                                    )
+                                : null,
+                            trailing: PopupMenuButton<String>(
+                              icon: const Icon(
+                                Icons.more_vert_rounded,
+                                color: AppTheme.textSecondary,
+                                size: 20,
+                              ),
+                              color: const Color(0xFF1E2330),
+                              onSelected: (val) {
+                                switch (val) {
+                                  case 'artist':
+                                    _openArtist(track);
+                                    break;
+                                  case 'album':
+                                    _openAlbum(track);
+                                    break;
+                                  case 'remove':
+                                    _removeTrack(track);
+                                    break;
+                                }
+                              },
+                              itemBuilder: (_) => [
+                                if (widget.onOpenArtist != null &&
+                                    track.artist.trim().isNotEmpty)
+                                  const PopupMenuItem(
+                                    value: 'artist',
+                                    child: Row(
+                                      children: [
+                                        Icon(Icons.person_outline_rounded,
+                                            size: 18),
+                                        SizedBox(width: 10),
+                                        Text('К исполнителю'),
+                                      ],
+                                    ),
+                                  ),
+                                if (widget.onOpenAlbum != null &&
+                                    (track.albumId ?? '').trim().isNotEmpty)
+                                  const PopupMenuItem(
+                                    value: 'album',
+                                    child: Row(
+                                      children: [
+                                        Icon(Icons.album_outlined, size: 18),
+                                        SizedBox(width: 10),
+                                        Text('К альбому'),
+                                      ],
+                                    ),
+                                  ),
+                                const PopupMenuItem(
+                                  value: 'remove',
+                                  child: Row(
+                                    children: [
+                                      Icon(Icons.delete_outline_rounded,
+                                          color: Colors.redAccent, size: 18),
+                                      SizedBox(width: 10),
+                                      Text(
+                                        'Удалить из плейлиста',
+                                        style:
+                                            TextStyle(color: Colors.redAccent),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        );
+                      }),
+                    const SizedBox(height: 32),
+                  ],
+                );
+              }(),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDesktop(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.transparent,
       body: SafeArea(

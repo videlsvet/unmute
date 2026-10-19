@@ -314,20 +314,22 @@ class _UnmuteShellState extends State<UnmuteShell> {
                 onLogout: _logout,
               );
       case AppSection.artists:
-        return _ComingSoonPage(
-          title: 'Исполнители',
-          subtitle:
-              'Персональная витрина артистов будет собираться из поиска и библиотеки.',
+        return _CollectionPage(
+          title: 'Артисты',
+          subtitle: 'Найди любимых исполнителей и открой их страницу.',
           icon: Icons.mic_external_on_rounded,
-          action: () => _setSection(AppSection.search),
+          favorites: _favorites,
+          onOpenArtist: _openArtist,
+          onSearch: () => _setSection(AppSection.search),
         );
       case AppSection.albums:
-        return _ComingSoonPage(
+        return _CollectionPage(
           title: 'Альбомы',
-          subtitle:
-              'Альбомная коллекция откроется отсюда. Сейчас альбомы доступны из поиска и треков.',
+          subtitle: 'Альбомы из твоего избранного.',
           icon: Icons.album_rounded,
-          action: () => _setSection(AppSection.search),
+          favorites: _favorites,
+          onOpenAlbum: _openAlbumFromTrack,
+          onSearch: () => _setSection(AppSection.search),
         );
       case AppSection.radio:
         return WavePage(
@@ -626,4 +628,109 @@ class _ComingSoonPage extends StatelessWidget {
       ),
     );
   }
+}
+
+class _CollectionPage extends StatelessWidget {
+  const _CollectionPage({
+    required this.title,
+    required this.subtitle,
+    required this.icon,
+    required this.favorites,
+    required this.onSearch,
+    this.onOpenArtist,
+    this.onOpenAlbum,
+  });
+
+  final String title;
+  final String subtitle;
+  final IconData icon;
+  final List<Track> favorites;
+  final ValueChanged<ArtistSummary>? onOpenArtist;
+  final ValueChanged<Track>? onOpenAlbum;
+  final VoidCallback onSearch;
+
+  @override
+  Widget build(BuildContext context) {
+    final artists = <String, ArtistSummary>{};
+    final albums = <String, Track>{};
+    for (final track in favorites) {
+      final artistName = track.artist.trim();
+      if (artistName.isNotEmpty) {
+        final key = '${track.source}:$artistName';
+        artists.putIfAbsent(key, () => ArtistSummary(
+          artistName: artistName,
+          source: track.source,
+          artistId: track.artistId,
+        ));
+      }
+      final albumId = (track.albumId ?? '').trim();
+      if (albumId.isNotEmpty) {
+        albums.putIfAbsent('${track.source}:$albumId', () => track);
+      }
+    }
+
+    final entries = onOpenArtist != null
+        ? artists.values.map((artist) => _CollectionEntry(
+              title: artist.artistName,
+              subtitle: 'Исполнитель · ${artist.source}',
+              image: favorites.firstWhere((track) => track.artist == artist.artistName).image,
+              icon: Icons.person_rounded,
+              onTap: () => onOpenArtist!(artist),
+            )).toList()
+        : albums.values.map((track) => _CollectionEntry(
+              title: track.albumTitle?.trim().isNotEmpty == true ? track.albumTitle! : 'Альбом',
+              subtitle: '${track.artist} · ${track.albumYear ?? track.source}',
+              image: track.image,
+              icon: Icons.album_rounded,
+              onTap: () => onOpenAlbum!(track),
+            )).toList();
+
+    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      Padding(
+        padding: const EdgeInsets.fromLTRB(22, 28, 22, 16),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text(title, style: Theme.of(context).textTheme.displaySmall),
+          const SizedBox(height: 6),
+          Text(subtitle, style: Theme.of(context).textTheme.bodyMedium),
+        ]),
+      ),
+      Expanded(
+        child: entries.isEmpty
+            ? EmptyStateWidget(
+                title: 'Здесь пока пусто',
+                subtitle: 'Ищи музыку и добавляй треки в избранное, чтобы собрать свою коллекцию.',
+                icon: icon,
+                action: ElevatedButton.icon(
+                  onPressed: onSearch,
+                  icon: const Icon(Icons.search_rounded),
+                  label: const Text('Найти музыку'),
+                ),
+              )
+            : ListView.separated(
+                padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+                itemCount: entries.length,
+                separatorBuilder: (_, __) => const SizedBox(height: 4),
+                itemBuilder: (context, index) => entries[index],
+              ),
+      ),
+    ]);
+  }
+}
+
+class _CollectionEntry extends StatelessWidget {
+  const _CollectionEntry({required this.title, required this.subtitle, required this.image, required this.icon, required this.onTap});
+  final String title;
+  final String subtitle;
+  final String? image;
+  final IconData icon;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) => ListTile(
+        onTap: onTap,
+        leading: UnmuteArtwork(imageUrl: image, size: 54, radius: AppTheme.radiusSm),
+        title: Text(title, maxLines: 1, overflow: TextOverflow.ellipsis, style: Theme.of(context).textTheme.titleMedium),
+        subtitle: Text(subtitle, maxLines: 1, overflow: TextOverflow.ellipsis),
+        trailing: Icon(icon, size: 20, color: AppTheme.textMuted),
+      );
 }
