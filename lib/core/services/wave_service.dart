@@ -337,6 +337,8 @@ class WaveGenerator {
   final AuthService? authService;
   final Random _random = Random();
 
+  final Set<String> _sessionPlayedKeys = {};
+
   Future<List<Track>> generate({
     String? seedArtistRaw,
     String? seedTitleRaw,
@@ -344,13 +346,11 @@ class WaveGenerator {
     WaveMode mode = WaveMode.flow,
   }) async {
     final seedArtist = canonicalArtist(seedArtistRaw);
-    final seedTitle = canonicalTitle(seedTitleRaw);
 
     final topArtists = await store.topArtists(10);
-    final topGenres = await store.topGenres(5);
-    final historySet = await store.historyKeysLast(200);
+    final historySet = await store.historyKeysLast(150);
 
-    // 1. Fetch user's saved favorites if available
+    // 1. Fetch user's saved favorites
     List<Track> userFavorites = const [];
     if (authService != null) {
       try {
@@ -361,7 +361,7 @@ class WaveGenerator {
       } catch (_) {}
     }
 
-    // 2. Mode: FAVORITES - play directly from user's favorite library
+    // 2. Mode: FAVORITES - play directly from user's liked tracks
     if (mode == WaveMode.favorites && userFavorites.isNotEmpty) {
       final validFavs = <Track>[];
       for (final t in userFavorites) {
@@ -376,204 +376,211 @@ class WaveGenerator {
       }
     }
 
-    // Extract favorite artists to seed personalization if history is empty
-    final effectiveTopArtists = <String>[...topArtists];
-    if (effectiveTopArtists.isEmpty && userFavorites.isNotEmpty) {
-      for (final t in userFavorites) {
-        final a = canonicalArtist(t.artist);
-        if (a.isNotEmpty && !effectiveTopArtists.contains(a)) {
-          effectiveTopArtists.add(a);
-        }
+    // 3. Extract user's favorite artists ranked by frequency
+    final artistFrequency = <String, int>{};
+    for (final t in userFavorites) {
+      final a = canonicalArtist(t.artist);
+      if (a.isNotEmpty) {
+        artistFrequency[a] = (artistFrequency[a] ?? 0) + 1;
+      }
+    }
+    // Add top artists from listening history
+    for (var i = 0; i < topArtists.length; i++) {
+      final a = canonicalArtist(topArtists[i]);
+      if (a.isNotEmpty) {
+        artistFrequency[a] = (artistFrequency[a] ?? 0) + (topArtists.length - i);
       }
     }
 
-    // COLD START — if no history, no favorites, and no seed
-    if (effectiveTopArtists.isEmpty && seedArtist.isEmpty) {
+    final rankedArtists = artistFrequency.keys.toList()
+      ..sort((a, b) => (artistFrequency[b] ?? 0).compareTo(artistFrequency[a] ?? 0));
+
+    // Fallback if user has no favorites and no seed
+    if (rankedArtists.isEmpty && seedArtist.isEmpty) {
       return generateColdStart(amount);
     }
 
-    // FORM QUERIES
-    final queries = <String>[];
+    // 4. Select top artists to search for
+    final searchQueries = <String>[];
     if (seedArtist.isNotEmpty) {
-      queries.add(seedArtist);
-      if (seedTitle.isNotEmpty) queries.add('$seedArtist $seedTitle');
+      searchQueries.add(seedArtist);
     }
 
-    for (final a in effectiveTopArtists.take(5)) {
-      if (a.isNotEmpty && a != seedArtist) queries.add(a);
+    // Pick top favorite artists
+    final availableArtists = rankedArtists.where((a) => a != seedArtist).toList();
+    if (availableArtists.isNotEmpty) {
+      availableArtists.shuffle(_random);
+      searchQueries.addAll(availableArtists.take(3));
     }
 
-    for (final g in topGenres.take(2)) {
-      if (g.isNotEmpty) queries.add(g);
-    }
-
-    if (seedTitle.isNotEmpty) {
-      final strong = _extractStrongWord(seedTitle);
-      if (strong != null) queries.add(strong);
-    }
-
-    // Mood-specific query injection
+    // Mood query additions
     switch (mode) {
       case WaveMode.exploration:
-        const explorationSeeds = [
-          'новые треки',
-          'свежая музыка',
-          'инди музыка',
+        const explorationQueries = [
+          'свежий инди рок',
+          'новая русская музыка',
+          'indie pop new',
           'открытия музыка',
-          'indie new',
         ];
-        queries.add(explorationSeeds[_random.nextInt(explorationSeeds.length)]);
+        searchQueries.add(explorationQueries[_random.nextInt(explorationQueries.length)]);
         break;
       case WaveMode.energy:
-        const energySeeds = [
-          'хиты драйв',
+        const energyQueries = [
           'танцевальные хиты',
+          'драйв рок',
           'клубная музыка',
-          'энергичные песни',
-          'рок драйв',
         ];
-        queries.add(energySeeds[_random.nextInt(energySeeds.length)]);
+        searchQueries.add(energyQueries[_random.nextInt(energyQueries.length)]);
         break;
       case WaveMode.calm:
-        const calmSeeds = [
-          'спокойная музыка',
-          'chillout lo-fi',
-          'акустика релакс',
-          'вечерний чилл',
-          'расслабляющая музыка',
+        const calmQueries = [
+          'спокойная музыка chill',
+          'lo-fi relax',
+          'акустика вечер',
         ];
-        queries.add(calmSeeds[_random.nextInt(calmSeeds.length)]);
+        searchQueries.add(calmQueries[_random.nextInt(calmQueries.length)]);
         break;
       case WaveMode.coldStart:
-        const popularSeeds = [
-          'топ чарт',
-          'главные хиты',
-          'популярные песни',
-          'лучшие треки',
-        ];
-        queries.add(popularSeeds[_random.nextInt(popularSeeds.length)]);
+        searchQueries.add('топ чарт хиты');
         break;
       case WaveMode.flow:
       case WaveMode.favorites:
         break;
     }
 
-    final distinctQueries = queries
-        .map((q) => q.trim())
-        .where((q) => q.isNotEmpty)
-        .toSet()
-        .take(8)
-        .toList();
+    // Dedup and take at most 3 queries for maximum parallel speed
+    final finalQueries = searchQueries.toSet().take(3).toList();
 
-    if (distinctQueries.isEmpty) return generateColdStart(amount);
+    // 5. PARALLEL FETCHING: Dispatch all queries at once
+    final searchFutures = finalQueries.map((q) => _safeSearch(q, 'yandex'));
+    final results = await Future.wait(searchFutures).timeout(
+      const Duration(milliseconds: 3200),
+      onTimeout: () => <List<Track>>[],
+    );
 
-    // FETCH CANDIDATES (Primary Yandex Music for high stream reliability)
     final candidates = <Track>[];
-    for (final q in distinctQueries) {
-      candidates.addAll(await _safeSearch(q, 'yandex'));
-      if (candidates.length < 15) {
-        candidates.addAll(await _safeSearch(q, 'vkmusic'));
-      }
+    for (final list in results) {
+      candidates.addAll(list);
     }
 
-    // CO-ARTISTS
-    final coArtists = _extractCoArtists(candidates, seedArtist, effectiveTopArtists.toSet());
-    for (final a in coArtists.take(3)) {
-      candidates.addAll(await _safeSearch(a, 'yandex'));
+    // 6. In FLOW mode: Mix in familiar favorite tracks directly (~30-40%)
+    final pickedFamiliar = <Track>[];
+    if (userFavorites.isNotEmpty && mode == WaveMode.flow) {
+      final eligibleFavs = userFavorites.where((t) {
+        if (!t.hasPlayableUrl) return false;
+        final k = store.makeTrackKey(t.artist, t.title);
+        return !_sessionPlayedKeys.contains(k);
+      }).toList()..shuffle(_random);
+      pickedFamiliar.addAll(eligibleFavs.take((amount * 0.35).round()));
     }
 
-    // FILTER CANDIDATES
-    final filtered = <Track>[];
+    // 7. Filter candidate tracks
+    final candidateSet = <Track>[];
     final seenKeys = <String>{};
 
-    for (final track in candidates) {
-      if (!track.hasPlayableUrl) continue;
+    for (final tr in candidates) {
+      if (!tr.hasPlayableUrl) continue;
+      final k = store.makeTrackKey(tr.artist, tr.title);
+      if (k.isEmpty || seenKeys.contains(k)) continue;
+      if (historySet.contains(k)) continue;
+      if (_sessionPlayedKeys.contains(k)) continue;
+      if (await store.isDisliked(k)) continue;
+      if (await store.skipCount(k) >= 3) continue;
 
-      final key = store.makeTrackKey(track.artist, track.title);
-      if (key.isEmpty || seenKeys.contains(key)) continue;
-      if (historySet.contains(key)) continue;
-      if (await store.isDisliked(key)) continue;
-      if (await store.skipCount(key) >= 3) continue;
-
-      seenKeys.add(key);
-      filtered.add(track);
+      seenKeys.add(k);
+      candidateSet.add(tr);
     }
 
-    if (filtered.isEmpty) return generateColdStart(amount);
+    // If candidates are scarce, try fallback or cold start
+    if (candidateSet.isEmpty && pickedFamiliar.isEmpty) {
+      return generateColdStart(amount);
+    }
 
-    // SCORE CANDIDATES
-    final topSet = effectiveTopArtists.toSet();
+    // 8. Score candidates based on ARTIST AFFINITY & PREFERENCES (NOT title words!)
+    final topArtistsSet = rankedArtists.take(10).toSet();
     final scored = <MapEntry<Track, double>>[];
-    for (final track in filtered) {
-      final score = await _scoreTrack(track, seedArtist, topSet, seedTitle);
+    for (final track in candidateSet) {
+      var score = 0.0;
+      final a = canonicalArtist(track.artist);
+      if (a.isNotEmpty && topArtistsSet.contains(a)) {
+        score += 5.0;
+      }
+      if (seedArtist.isNotEmpty && a == seedArtist) {
+        score += 3.0;
+      }
+      final k = store.makeTrackKey(track.artist, track.title);
+      final skips = await store.skipCount(k);
+      score -= skips * 2.0;
+
+      // Subtle jitter to keep stream varied
+      score += _random.nextDouble() * 2.0;
       scored.add(MapEntry(track, score));
     }
 
     scored.sort((a, b) => b.value.compareTo(a.value));
 
-    // DIVERSITY MIX: familiar + discoveries
-    final familiar = scored.where((e) {
-      final a = canonicalArtist(e.key.artist);
-      return a.isNotEmpty && topSet.contains(a);
-    }).toList();
+    // 9. Mix familiar + recommended tracks with consecutive artist limiting
+    final resultList = <Track>[];
+    final artistCount = <String, int>{};
 
-    final discoveries = scored.where((e) {
-      final a = canonicalArtist(e.key.artist);
-      return a.isNotEmpty && !topSet.contains(a);
-    }).toList();
-
-    final discoveryRatio = switch (mode) {
-      WaveMode.coldStart => 0.5,
-      WaveMode.exploration => 0.6,
-      WaveMode.flow => 0.3,
-      WaveMode.favorites => 0.05,
-      WaveMode.energy => 0.25,
-      WaveMode.calm => 0.25,
-    };
-
-    final targetDiscoveries =
-        (amount * discoveryRatio).toInt().clamp(3, max(4, amount - 5));
-
-    final byArtistCount = <String, int>{};
-    final picked = <Track>[];
-
-    bool tryAdd(Track tr) {
-      final artist = canonicalArtist(tr.artist);
-      final count = byArtistCount[artist] ?? 0;
-      if (artist.isNotEmpty && count >= 2) return false;
-      picked.add(tr);
-      byArtistCount[artist] = count + 1;
+    bool canAdd(Track tr) {
+      final a = canonicalArtist(tr.artist);
+      final count = artistCount[a] ?? 0;
+      if (a.isNotEmpty && count >= 2) return false;
+      resultList.add(tr);
+      artistCount[a] = count + 1;
+      final k = store.makeTrackKey(tr.artist, tr.title);
+      _sessionPlayedKeys.add(k);
       return true;
     }
 
-    var discCount = 0;
-    for (final e in discoveries) {
-      if (picked.length >= amount) break;
-      if (discCount >= targetDiscoveries) break;
-      if (tryAdd(e.key)) discCount++;
+    // Interleave familiar and recommendations
+    var favIndex = 0;
+    var recIndex = 0;
+    while (resultList.length < amount && (favIndex < pickedFamiliar.length || recIndex < scored.length)) {
+      if (favIndex < pickedFamiliar.length && (resultList.length % 3 == 0 || recIndex >= scored.length)) {
+        canAdd(pickedFamiliar[favIndex++]);
+      } else if (recIndex < scored.length) {
+        canAdd(scored[recIndex++].key);
+      } else {
+        break;
+      }
     }
 
-    for (final e in [...familiar, ...discoveries]) {
-      if (picked.length >= amount) break;
-      tryAdd(e.key);
+    // Fill remaining if needed
+    for (final e in scored) {
+      if (resultList.length >= amount) break;
+      final k = store.makeTrackKey(e.key.artist, e.key.title);
+      if (!_sessionPlayedKeys.contains(k)) {
+        resultList.add(e.key);
+        _sessionPlayedKeys.add(k);
+      }
     }
 
-    if (picked.isNotEmpty) return picked;
-    return await generateColdStart(amount);
+    if (resultList.isNotEmpty) {
+      return resultList;
+    }
+    return generateColdStart(amount);
   }
 
   Future<List<Track>> generateColdStart(int amount) async {
     const popularQueries = [
-      'топ чарт 2025',
-      'популярные треки',
-      'главные хиты',
+      'топ чарт хиты',
+      'популярная музыка',
       'новинки недели',
-      'лучшая музыка',
     ];
 
+    // Fetch popular in parallel
+    final results = await Future.wait(
+      popularQueries.map((q) => _safeSearch(q, 'yandex')),
+    ).timeout(
+      const Duration(milliseconds: 3000),
+      onTimeout: () => <List<Track>>[],
+    );
+
     final candidates = <Track>[];
-    for (final q in popularQueries.take(3)) {
-      candidates.addAll(await _safeSearch(q, 'yandex'));
+    for (final list in results) {
+      candidates.addAll(list);
     }
 
     final valid = candidates.where((t) => t.hasPlayableUrl).toList();
@@ -586,85 +593,12 @@ class WaveGenerator {
       final res = await musicService.search(
         service: service,
         query: query,
-        limit: 15,
+        limit: 20,
       );
       return res.tracks;
     } catch (_) {
       return const [];
     }
-  }
-
-  Future<double> _scoreTrack(
-    Track track,
-    String seedArtist,
-    Set<String> topArtists,
-    String seedTitle,
-  ) async {
-    var score = 0.0;
-    final a = canonicalArtist(track.artist);
-    final t = canonicalTitle(track.title);
-
-    if (a.isNotEmpty && topArtists.contains(a)) score += 5.0;
-    if (seedArtist.isNotEmpty && a == seedArtist) score += 3.0;
-
-    if (seedTitle.isNotEmpty && t.isNotEmpty) {
-      final seedWords = seedTitle.split(' ').where((w) => w.length >= 3).toSet();
-      final trackWords = t.split(' ').where((w) => w.length >= 3).toSet();
-      final overlap = trackWords.intersection(seedWords).length;
-      score += overlap * 0.5;
-    }
-
-    final key = store.makeTrackKey(track.artist, track.title);
-    final skips = await store.skipCount(key);
-    score -= skips * 1.5;
-
-    score += _random.nextDouble();
-    return score;
-  }
-
-  List<String> _extractCoArtists(
-    List<Track> candidates,
-    String seedArtist,
-    Set<String> topArtists,
-  ) {
-    final counts = <String, int>{};
-    for (final tr in candidates) {
-      final raw = tr.artist.toLowerCase();
-      if (raw.isEmpty) continue;
-      const splitters = [' feat. ', ' ft. ', ' & ', ', ', ' x '];
-      for (final sp in splitters) {
-        if (raw.contains(sp)) {
-          final parts = raw.split(sp);
-          for (final p in parts.skip(1)) {
-            final ca = canonicalArtist(p);
-            if (ca.isNotEmpty && ca != seedArtist && !topArtists.contains(ca)) {
-              counts[ca] = (counts[ca] ?? 0) + 1;
-            }
-          }
-        }
-      }
-    }
-
-    final sorted = counts.entries.toList()
-      ..sort((a, b) => b.value.compareTo(a.value));
-    return sorted.take(5).map((e) => e.key).toList();
-  }
-
-  String? _extractStrongWord(String title) {
-    const stopWords = {
-      'the', 'a', 'an', 'and', 'or', 'to', 'of', 'in', 'on', 'for', 'with', 'at', 'by',
-      'love', 'night', 'day', 'remix', 'mix', 'edit', 'radio', 'version', 'live', 'remastered',
-      'feat', 'ft', 'featuring', 'и', 'а', 'но', 'на', 'в', 'во', 'к', 'ко', 'у', 'от',
-      'за', 'про', 'без', 'для', 'по', 'ты', 'я', 'мы', 'вы', 'он', 'она', 'они', 'ремикс'
-    };
-
-    final words = title
-        .replaceAll(RegExp(r'[^a-z0-9а-я\s]'), ' ')
-        .toLowerCase()
-        .split(RegExp(r'\s+'))
-        .where((w) => w.length >= 5 && !stopWords.contains(w));
-
-    return words.isEmpty ? null : words.first;
   }
 }
 

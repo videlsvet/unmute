@@ -374,6 +374,7 @@ class _FavoritesRedesignPageState extends State<FavoritesRedesignPage> {
             searchController: _searchController,
             sort: _sort,
             gridMode: _gridMode,
+            isMobile: isMobile,
             onSearchChanged: (_) => setState(() {}),
             onSortChanged: (value) {
               if (value == null) return;
@@ -898,6 +899,7 @@ class _LibraryToolbar extends StatelessWidget {
     required this.onSearchChanged,
     required this.onSortChanged,
     required this.onToggleView,
+    this.isMobile = false,
   });
 
   final TextEditingController searchController;
@@ -906,9 +908,107 @@ class _LibraryToolbar extends StatelessWidget {
   final ValueChanged<String> onSearchChanged;
   final ValueChanged<_FavoritesSort?> onSortChanged;
   final VoidCallback onToggleView;
+  final bool isMobile;
 
   @override
   Widget build(BuildContext context) {
+    if (isMobile) {
+      return Row(
+        children: [
+          Expanded(
+            child: Container(
+              height: 38,
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.08),
+                borderRadius: BorderRadius.circular(19),
+                border: Border.all(color: Colors.white.withValues(alpha: 0.06)),
+              ),
+              child: TextField(
+                controller: searchController,
+                onChanged: onSearchChanged,
+                style: const TextStyle(fontSize: 14, color: Colors.white),
+                cursorColor: AppTheme.accent,
+                decoration: InputDecoration(
+                  isDense: true,
+                  hintText: 'Поиск в избранном...',
+                  hintStyle: TextStyle(
+                    fontSize: 13,
+                    color: Colors.white.withValues(alpha: 0.4),
+                  ),
+                  prefixIcon: Icon(
+                    Icons.search_rounded,
+                    size: 18,
+                    color: Colors.white.withValues(alpha: 0.5),
+                  ),
+                  prefixIconConstraints:
+                      const BoxConstraints(minWidth: 36, minHeight: 36),
+                  suffixIcon: searchController.text.isNotEmpty
+                      ? GestureDetector(
+                          onTap: () {
+                            searchController.clear();
+                            onSearchChanged('');
+                          },
+                          child: Icon(
+                            Icons.close_rounded,
+                            size: 16,
+                            color: Colors.white.withValues(alpha: 0.5),
+                          ),
+                        )
+                      : null,
+                  suffixIconConstraints:
+                      const BoxConstraints(minWidth: 36, minHeight: 36),
+                  border: InputBorder.none,
+                  contentPadding:
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(width: 8),
+          PopupMenuButton<_FavoritesSort>(
+            initialValue: sort,
+            onSelected: onSortChanged,
+            color: const Color(0xFF221C20),
+            shape:
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+            itemBuilder: (context) => const [
+              PopupMenuItem(
+                  value: _FavoritesSort.recent, child: Text('Недавние')),
+              PopupMenuItem(
+                  value: _FavoritesSort.title, child: Text('По названию')),
+              PopupMenuItem(
+                  value: _FavoritesSort.artist, child: Text('По артисту')),
+            ],
+            child: Container(
+              height: 38,
+              padding: const EdgeInsets.symmetric(horizontal: 10),
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.08),
+                borderRadius: BorderRadius.circular(19),
+                border: Border.all(color: Colors.white.withValues(alpha: 0.06)),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(Icons.sort_rounded,
+                      size: 18, color: Colors.white70),
+                  const SizedBox(width: 4),
+                  Text(
+                    sort == _FavoritesSort.recent
+                        ? 'Недавние'
+                        : (sort == _FavoritesSort.title
+                            ? 'По названию'
+                            : 'По артисту'),
+                    style: const TextStyle(fontSize: 12, color: Colors.white70),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      );
+    }
+
     return PremiumSurface(
       padding: const EdgeInsets.all(12),
       radius: AppTheme.radiusLg,

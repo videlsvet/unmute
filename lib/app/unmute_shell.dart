@@ -208,15 +208,21 @@ class _UnmuteShellState extends State<UnmuteShell> {
   Future<void> _handleLoggedIn() async {
     await _loadToken();
     await _refreshFavorites();
+    if (!mounted) return;
+    setState(() {
+      _section = AppSection.home;
+      _detailStack = const [];
+    });
   }
 
   Future<void> _logout() async {
+    await _playerController.stop();
     await _authService.logout();
     if (!mounted) return;
     setState(() {
       _token = null;
       _favorites = const [];
-      _section = AppSection.search;
+      _section = AppSection.home;
       _detailStack = const [];
     });
   }
@@ -398,6 +404,13 @@ class _UnmuteShellState extends State<UnmuteShell> {
 
   @override
   Widget build(BuildContext context) {
+    if (_token == null || _token!.isEmpty) {
+      return AuthRedesignPage(
+        authService: _authService,
+        onLoggedIn: _handleLoggedIn,
+      );
+    }
+
     return AnimatedBuilder(
       animation: _playerController,
       builder: (context, _) {
@@ -472,9 +485,21 @@ class _UnmuteShellState extends State<UnmuteShell> {
                                     isMobile ? 0 : 10,
                                   ),
                                   child: AnimatedSwitcher(
-                                    duration: const Duration(milliseconds: 260),
+                                    duration: const Duration(milliseconds: 220),
                                     switchInCurve: Curves.easeOutCubic,
-                                    switchOutCurve: Curves.easeOutCubic,
+                                    switchOutCurve: Curves.easeInCubic,
+                                    transitionBuilder: (child, animation) {
+                                      return FadeTransition(
+                                        opacity: animation,
+                                        child: SlideTransition(
+                                          position: Tween<Offset>(
+                                            begin: const Offset(0.0, 0.015),
+                                            end: Offset.zero,
+                                          ).animate(animation),
+                                          child: child,
+                                        ),
+                                      );
+                                    },
                                     child: KeyedSubtree(
                                       key: ValueKey(
                                         _detailStack.isEmpty
@@ -564,7 +589,10 @@ class _MobileBottomNavBar extends StatelessWidget {
             final active = current == item.$1;
             return InkWell(
               borderRadius: BorderRadius.circular(16),
-              onTap: () => onChanged(item.$1),
+              onTap: () {
+                HapticFeedback.selectionClick();
+                onChanged(item.$1);
+              },
               child: Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
                 child: Column(
