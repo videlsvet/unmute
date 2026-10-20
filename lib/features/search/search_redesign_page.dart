@@ -116,11 +116,13 @@ class _SearchRedesignPageState extends State<SearchRedesignPage> {
     }
 
     try {
+      final token = await widget.authService.getSavedToken();
       final result = await widget.musicService.search(
         service: _service,
         query: query,
         limit: 40,
         offset: reset ? 0 : _nextOffset,
+        token: token,
       );
 
       if (!mounted) return;

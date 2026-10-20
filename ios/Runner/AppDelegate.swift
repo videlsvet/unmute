@@ -6,6 +6,8 @@ import MediaPlayer
 @main
 @objc class AppDelegate: FlutterAppDelegate, FlutterImplicitEngineDelegate {
   private var nowPlayingChannel: FlutterMethodChannel?
+  private var currentArtwork: MPMediaItemArtwork?
+  private var currentArtworkUrl: String?
 
   override func application(
     _ application: UIApplication,
@@ -49,7 +51,7 @@ import MediaPlayer
   }
 
   private func updateNowPlayingInfo(args: [String: Any]) {
-    var info = [String: Any]()
+    var info = MPNowPlayingInfoCenter.default().nowPlayingInfo ?? [String: Any]()
     info[MPMediaItemPropertyTitle] = args["title"] as? String ?? ""
     info[MPMediaItemPropertyArtist] = args["artist"] as? String ?? ""
     info[MPMediaItemPropertyAlbumTitle] = args["album"] as? String ?? ""
@@ -62,20 +64,36 @@ import MediaPlayer
     info[MPNowPlayingInfoPropertyElapsedPlaybackTime] = position
     info[MPNowPlayingInfoPropertyPlaybackRate] = isPlaying ? 1.0 : 0.0
 
-    if let artworkUrlString = args["artworkUrl"] as? String,
-       let artworkUrl = URL(string: artworkUrlString),
-       !artworkUrlString.isEmpty {
-      DispatchQueue.global(qos: .utility).async {
-        if let data = try? Data(contentsOf: artworkUrl),
-           let image = UIImage(data: data) {
-          DispatchQueue.main.async {
-            var currentInfo = MPNowPlayingInfoCenter.default().nowPlayingInfo ?? [:]
-            let artwork = MPMediaItemArtwork(boundsSize: image.size, requestHandler: { _ in image })
-            currentInfo[MPMediaItemPropertyArtwork] = artwork
-            MPNowPlayingInfoCenter.default().nowPlayingInfo = currentInfo
+    // Keep cached artwork in info so it never flashes or disappears on update
+    if let cachedArtwork = self.currentArtwork {
+      info[MPMediaItemPropertyArtwork] = cachedArtwork
+    }
+
+    let artworkUrlString = (args["artworkUrl"] as? String ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+
+    if !artworkUrlString.isEmpty && artworkUrlString != self.currentArtworkUrl {
+      self.currentArtworkUrl = artworkUrlString
+      if let artworkUrl = URL(string: artworkUrlString) {
+        DispatchQueue.global(qos: .utility).async { [weak self] in
+          guard let self = self else { return }
+          if let data = try? Data(contentsOf: artworkUrl),
+             let image = UIImage(data: data) {
+            DispatchQueue.main.async {
+              // Ensure URL hasn't changed during download
+              guard self.currentArtworkUrl == artworkUrlString else { return }
+              let artwork = MPMediaItemArtwork(boundsSize: image.size, requestHandler: { _ in image })
+              self.currentArtwork = artwork
+              var currentInfo = MPNowPlayingInfoCenter.default().nowPlayingInfo ?? [:]
+              currentInfo[MPMediaItemPropertyArtwork] = artwork
+              MPNowPlayingInfoCenter.default().nowPlayingInfo = currentInfo
+            }
           }
         }
       }
+    } else if artworkUrlString.isEmpty && self.currentArtworkUrl != nil {
+      self.currentArtwork = nil
+      self.currentArtworkUrl = nil
+      info.removeValue(forKey: MPMediaItemPropertyArtwork)
     }
 
     MPNowPlayingInfoCenter.default().nowPlayingInfo = info

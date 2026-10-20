@@ -191,8 +191,11 @@ class PlayerController extends ChangeNotifier {
   }
 
   Future<void> _playTrackInternal(Track track) async {
-    final preparedTrack = await _prepareTrack(track);
-    final url = (preparedTrack.preview ?? '').trim();
+    var preparedTrack = track;
+    if (!preparedTrack.hasPlayableUrl) {
+      preparedTrack = await _prepareTrack(track);
+    }
+    var url = (preparedTrack.preview ?? '').trim();
 
     if (url.isEmpty) {
       _lastPlaybackErrorAt = null;
@@ -222,6 +225,20 @@ class PlayerController extends ChangeNotifier {
         play: true,
       );
     } catch (e) {
+      // If playback fails (e.g. expired link), try one-time fresh resolution if available
+      if (prepareTrackForPlayback != null) {
+        try {
+          final refreshed = await prepareTrackForPlayback!(track);
+          final freshUrl = (refreshed.preview ?? '').trim();
+          if (freshUrl.isNotEmpty && freshUrl != url) {
+            _replaceTrackInQueue(refreshed);
+            currentTrack = refreshed;
+            await _player.open(mk.Media(freshUrl), play: true);
+            return;
+          }
+        } catch (_) {}
+      }
+
       _lastPlaybackErrorAt = DateTime.now();
       error = 'Ошибка воспроизведения: $e';
       isPlaying = false;

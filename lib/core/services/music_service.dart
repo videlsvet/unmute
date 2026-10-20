@@ -22,6 +22,15 @@ class SearchPageResult {
     final artistsRaw = (json['artists'] as List?) ?? const [];
     final fallbackSource = (json['source'] ?? json['service'] ?? '').toString();
 
+    // Check if the backend returned an error (e.g. missing or invalid VK token)
+    if (tracksRaw.length == 1 && tracksRaw.first is Map) {
+      final firstMap = tracksRaw.first as Map;
+      final err = (firstMap['error'] ?? '').toString().trim();
+      if (err.isNotEmpty) {
+        throw Exception(err);
+      }
+    }
+
     final tracks = tracksRaw
         .whereType<Map>()
         .map((e) {
@@ -173,6 +182,7 @@ class MusicService {
     required String query,
     int limit = 40,
     int offset = 0,
+    String? token,
   }) async {
     final params = {
       'type': 'search_v2',
@@ -181,6 +191,9 @@ class MusicService {
       'limit': '$limit',
       'offset': '$offset',
     };
+    if (token != null && token.trim().isNotEmpty) {
+      params['token'] = token.trim();
+    }
 
     final data = await _fetchWithFallback(params);
     if (data is Map) {
@@ -261,7 +274,7 @@ class MusicService {
   }
 
   Future<List<Track>> loadSimilarTracks({
-    required String service,
+    String service = 'yandex',
     required String trackId,
   }) async {
     final params = <String, String>{

@@ -1,0 +1,23 @@
+openapi: 3.0.0
+info:
+  title: Wave API Gateway
+  version: 1.0.0
+
+servers:
+- url: https://d5dn6r204cm4tpgfe0ms.kf69zffa.apigw.yandexcloud.net
+paths:
+  /search:
+    get:
+      summary: Search tracks
+      x-yc-apigateway-integration:
+        type: cloud_functions
+        function_id: d4e09khm9p5t3cu2oq22   # 👈 твой правильный ID функции
+        tag: $latest
+
+  /lyrics:
+    get:
+      summary: Get lyrics
+      x-yc-apigateway-integration:
+        type: cloud_functions
+        function_id: d4e09khm9p5t3cu2oq22
+        tag: $latest

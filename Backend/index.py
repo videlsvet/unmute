@@ -830,9 +830,9 @@ def _build_wave_payload(session: Any, nickname: str, service: str, mode: str, li
         seeds.append(c)
 
     for a in top_artists[:6]:
-        add_seed(a)
-        for sim in _get_similar_artists(a)[:3]:
+        for sim in _get_similar_artists(a)[:4]:
             add_seed(sim)
+        add_seed(f"{a} похожие")
 
     if mode == "exploration":
         for query in ("свежий инди рок", "новинки музыки", "indie alternative fresh", "новый русский хип хоп"):
@@ -851,15 +851,6 @@ def _build_wave_payload(session: Any, nickname: str, service: str, mode: str, li
     used_keys = set()
     favorite_keys = {_track_key(item) for item in favorites}
 
-    # In flow mode, anchor ~25% familiar favorites
-    if mode == "flow" and favorites:
-        fav_sample = [f for f in favorites if (f.get("preview") or "").strip()][: max(2, min(8, limit // 4))]
-        for item in fav_sample:
-            k = _track_key(item)
-            if k not in used_keys:
-                used_keys.add(k)
-                raw_candidates.append(item)
-
     per_seed = 10 if mode == "exploration" else 8
     for seed in seeds[:12]:
         found = _search_wave_candidates(service, seed, per_seed)
@@ -867,7 +858,8 @@ def _build_wave_payload(session: Any, nickname: str, service: str, mode: str, li
             k = _track_key(item)
             if k in used_keys:
                 continue
-            if mode == "exploration" and k in favorite_keys:
+            # In recommendation modes, strictly exclude tracks that user already liked
+            if mode != "favorites" and k in favorite_keys:
                 continue
             used_keys.add(k)
             raw_candidates.append(item)

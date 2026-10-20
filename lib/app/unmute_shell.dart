@@ -130,17 +130,25 @@ class _UnmuteShellState extends State<UnmuteShell> {
   }
 
   Future<Track> _prepareTrackForPlayback(Track track) async {
+    if (track.hasPlayableUrl) {
+      return track;
+    }
+
     final source = track.source.trim().toLowerCase();
     if (source != 'yandex') return track;
 
     final token = _token ?? await _authService.getSavedToken();
     if (token == null || token.isEmpty) return track;
 
-    final freshUrl = await _authService.getFreshFavoriteStream(
-      token: token,
-      trackId: track.id,
-    );
-    return track.copyWith(preview: freshUrl);
+    try {
+      final freshUrl = await _authService.getFreshFavoriteStream(
+        token: token,
+        trackId: track.id,
+      );
+      return track.copyWith(preview: freshUrl);
+    } catch (_) {
+      return track;
+    }
   }
 
   Future<void> _loadToken() async {

@@ -583,11 +583,13 @@ class WaveGenerator {
     // Mode-specific query synthesis
     switch (mode) {
       case WaveMode.flow:
-        // Balanced: Mix favorite artist anchors and kindred artists
-        final shuffledCore = List<String>.from(coreArtists)..shuffle(_random);
-        searchQueries.addAll(shuffledCore.take(2));
+        // Personal Flow: Focus on kindred artists and collaborative discovery
         final shuffledKindred = kindredArtists.toList()..shuffle(_random);
-        searchQueries.addAll(shuffledKindred.take(2));
+        searchQueries.addAll(shuffledKindred.take(3));
+        if (coreArtists.isNotEmpty) {
+          final topA = coreArtists[_random.nextInt(coreArtists.length)];
+          searchQueries.add('$topA похожие');
+        }
         break;
 
       case WaveMode.exploration:
@@ -643,7 +645,7 @@ class WaveGenerator {
     // Dedup and select top 3-4 queries for fast parallel search
     final finalQueries = searchQueries.toSet().take(4).toList();
 
-    // 6. PARALLEL FETCH: Gather candidates from search and server Wave endpoint
+    // 6. PARALLEL FETCH: Gather candidates from search, similar tracks, and server Wave endpoint
     final rawCandidates = <Track>[];
 
     // A) Server Wave endpoint (if authenticated)
@@ -662,11 +664,32 @@ class WaveGenerator {
     // B) Parallel search queries
     final searchFutures = finalQueries.map((q) => _safeSearch(q, 'yandex'));
 
+    // C) Yandex Music native collaborative filtering: fetch similar tracks using favorite seeds
+    final similarFutures = <Future<List<Track>>>[];
+    final sampledSeeds = (List<Track>.from(userFavorites)..shuffle(_random)).take(4);
+    for (final seedTrack in sampledSeeds) {
+      if (seedTrack.id.isNotEmpty) {
+        similarFutures.add(
+          musicService
+              .loadSimilarTracks(service: 'yandex', trackId: seedTrack.id)
+              .catchError((_) => <Track>[]),
+        );
+      }
+    }
+
     final searchResults = await Future.wait(searchFutures).timeout(
       const Duration(milliseconds: 3200),
       onTimeout: () => <List<Track>>[],
     );
     for (final list in searchResults) {
+      rawCandidates.addAll(list);
+    }
+
+    final similarResults = await Future.wait(similarFutures).timeout(
+      const Duration(milliseconds: 3000),
+      onTimeout: () => <List<Track>>[],
+    );
+    for (final list in similarResults) {
       rawCandidates.addAll(list);
     }
 
@@ -680,20 +703,13 @@ class WaveGenerator {
       } catch (_) {}
     }
 
-    // 7. Familiar anchors: In FLOW mode, mix in ~25% familiar favorites
-    final pickedFamiliar = <Track>[];
-    if (userFavorites.isNotEmpty && mode == WaveMode.flow) {
-      final eligibleFavs = userFavorites.where((t) {
-        if (!t.hasPlayableUrl) return false;
-        final k = store.makeTrackKey(t.artist, t.title);
-        return !_sessionPlayedKeys.contains(k);
-      }).toList()..shuffle(_random);
-      pickedFamiliar.addAll(eligibleFavs.take((amount * 0.25).round()));
-    }
-
-    // 8. Filter candidate tracks
+    // 7. Filter candidate tracks
     final candidateSet = <Track>[];
     final seenKeys = <String>{};
+    final favoriteKeys = userFavorites
+        .map((fav) => store.makeTrackKey(fav.artist, fav.title))
+        .where((k) => k.isNotEmpty)
+        .toSet();
 
     for (final tr in rawCandidates) {
       if (!tr.hasPlayableUrl) continue;
@@ -704,9 +720,9 @@ class WaveGenerator {
       if (await store.isDisliked(k)) continue;
       if (await store.skipCount(k) >= 3) continue;
 
-      // In discovery mode, filter out tracks user already has in favorites
-      if (mode == WaveMode.exploration &&
-          userFavorites.any((fav) => store.makeTrackKey(fav.artist, fav.title) == k)) {
+      // In recommendation modes, strictly exclude tracks already in user's favorites!
+      // My Wave is purely for discovering new music and similar recommendations.
+      if (mode != WaveMode.favorites && favoriteKeys.contains(k)) {
         continue;
       }
 
@@ -714,11 +730,11 @@ class WaveGenerator {
       candidateSet.add(tr);
     }
 
-    if (candidateSet.isEmpty && pickedFamiliar.isEmpty) {
+    if (candidateSet.isEmpty) {
       return generateColdStart(amount);
     }
 
-    // 9. Multi-factor scoring formula:
+    // 8. Multi-factor scoring formula:
     // Affinity + Similarity + Mode Novelty - Skips - Session Skips + Jitter
     final topArtistsSet = rankedArtists.take(10).toSet();
     final kindredSet = kindredArtists.map(canonicalArtist).toSet();
@@ -730,12 +746,12 @@ class WaveGenerator {
 
       // Core artist affinity
       if (a.isNotEmpty && topArtistsSet.contains(a)) {
-        score += 6.0;
+        score += 4.0;
       }
 
-      // Kindred / similar artist bonus
+      // Kindred / similar artist bonus (strong discovery reward)
       if (a.isNotEmpty && kindredSet.contains(a)) {
-        score += 5.0;
+        score += 6.0;
       }
 
       // Session steering penalty: if artist was skipped in current session, heavily penalize
@@ -757,24 +773,8 @@ class WaveGenerator {
     scored.sort((a, b) => b.value.compareTo(a.value));
     final rankedCandidates = scored.map((e) => e.key).toList();
 
-    // 10. Interleave familiar and discovery tracks with anti-fatigue
-    final combined = <Track>[];
-    var favIdx = 0;
-    var candIdx = 0;
-
-    while (combined.length < amount * 2 &&
-        (favIdx < pickedFamiliar.length || candIdx < rankedCandidates.length)) {
-      if (favIdx < pickedFamiliar.length &&
-          (combined.length % 4 == 0 || candIdx >= rankedCandidates.length)) {
-        combined.add(pickedFamiliar[favIdx++]);
-      } else if (candIdx < rankedCandidates.length) {
-        combined.add(rankedCandidates[candIdx++]);
-      } else {
-        break;
-      }
-    }
-
-    final finalResult = _enforceAntiFatigue(combined, amount);
+    // 9. Sequence formatting with anti-fatigue (no repeating artists)
+    final finalResult = _enforceAntiFatigue(rankedCandidates, amount);
     for (final t in finalResult) {
       _sessionPlayedKeys.add(store.makeTrackKey(t.artist, t.title));
     }

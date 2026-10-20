@@ -961,17 +961,39 @@ def search_soundcloud(
 # ===== VK Music (Search + Artist + Album-as-Playlist) =================================
 # ======================================================================================
 
+def _get_vk_token(token: Optional[str] = None) -> Optional[str]:
+    if token and str(token).strip():
+        return str(token).strip()
+    for k in (
+        "VKMusic_ACCESS_TOKEN",
+        "VKMUSIC_ACCESS_TOKEN",
+        "VK_ACCESS_TOKEN",
+        "VK_MUSIC_ACCESS_TOKEN",
+        "VKMUSIC_TOKEN",
+        "VK_TOKEN",
+    ):
+        v = (os.getenv(k) or "").strip()
+        if v:
+            return v
+    return None
+
 def _vk_call(method: str, token: str, params: Dict[str, Any], use_proxy: bool = False) -> Dict[str, Any]:
     base = "https://api.vk.com/method/"
     p = dict(params)
     p["access_token"] = token
     p.setdefault("v", "5.131")
 
+    headers = {
+        "User-Agent": "VKAndroidApp/8.29-17342 (Android 11; SDK 30; arm64-v8a; Google Pixel 6; ru; 2400x1080)"
+    }
+    proxies = _proxies_if_enabled() if use_proxy else None
+
     r = _HTTP.get(
         base + method,
         params=p,
         timeout=_CFG.http_timeout_s,
-        headers={"User-Agent": "WaveServer/1.0"},
+        headers=headers,
+        proxies=proxies,
         allow_redirects=True,
     )
     r.raise_for_status()
@@ -1112,7 +1134,7 @@ def _vk_enrich_previews_batch(tracks: List[Dict[str, Any]], token: str) -> None:
         except Exception as e:
             print("VK enrich batch error:", type(e).__name__, str(e))
 
-def search_vkmusic(q: str, performer_only: int = 0, offset: int = 0, count: int = 50) -> List[Dict[str, Any]]:
+def search_vkmusic(q: str, performer_only: int = 0, offset: int = 0, count: int = 50, token: Optional[str] = None) -> List[Dict[str, Any]]:
     q_norm = " ".join((q or "").strip().split())
     offset = max(0, int(offset))
     count = max(1, min(int(count), 200))
@@ -1121,14 +1143,14 @@ def search_vkmusic(q: str, performer_only: int = 0, offset: int = 0, count: int 
     if cached:
         return cached
 
-    token = os.getenv("VKMusic_ACCESS_TOKEN")
-    if not token:
-        return [{"error": "vkmusic: missing VKMusic_ACCESS_TOKEN"}]
+    vk_tok = _get_vk_token(token)
+    if not vk_tok:
+        return [{"error": "vkmusic: missing VK access token. Please provide token or set VK_ACCESS_TOKEN in environment"}]
 
     try:
         rj = _vk_call(
             "audio.search",
-            token=token,
+            token=vk_tok,
             params={
                 "q": q_norm,
                 "count": count,
@@ -1141,19 +1163,21 @@ def search_vkmusic(q: str, performer_only: int = 0, offset: int = 0, count: int 
         items = (rj.get("response") or {}).get("items", [])
         tracks = [_norm_vkmusic(x) for x in items]
 
-        # ❌ НЕ тянем preview в поиске — только метаданные
-        _vk_enrich_previews_batch(tracks, token)
+        try:
+            _vk_enrich_previews_batch(tracks, vk_tok)
+        except Exception as enrich_err:
+            print("VK preview enrich warning:", enrich_err)
+
         cache_set(cache_key, tracks, ttl=60)
         return tracks
-
 
     except Exception as e:
         return [{"error": f"vkmusic: {e}"}]
 
-def vk_preview(track_id: str) -> Dict[str, Any]:
-    token = os.getenv("VKMusic_ACCESS_TOKEN")
-    if not token:
-        return {"error": "vkmusic: missing VKMusic_ACCESS_TOKEN"}
+def vk_preview(track_id: str, token: Optional[str] = None) -> Dict[str, Any]:
+    vk_tok = _get_vk_token(token)
+    if not vk_tok:
+        return {"error": "vkmusic: missing VK access token"}
 
     parts = track_id.split("_")
     if len(parts) < 2:
@@ -1168,7 +1192,7 @@ def vk_preview(track_id: str) -> Dict[str, Any]:
         audios = f"{audios}_{access_key}"
 
     try:
-        rj = _vk_call("audio.getById", token=token, params={"audios": audios})
+        rj = _vk_call("audio.getById", token=vk_tok, params={"audios": audios})
         arr = rj.get("response") or []
         it = arr[0] if isinstance(arr, list) and arr else {}
         url = it.get("url")
@@ -1181,10 +1205,10 @@ def vk_preview(track_id: str) -> Dict[str, Any]:
     except Exception as e:
         return {"error": f"vkmusic preview: {e}"}
 
-def vk_artist_tracks(artist_id: Optional[str], artist_name: Optional[str]) -> Dict[str, Any]:
-    token = os.getenv("VKMusic_ACCESS_TOKEN")
-    if not token:
-        return {"error": "vkmusic: missing VKMusic_ACCESS_TOKEN"}
+def vk_artist_tracks(artist_id: Optional[str], artist_name: Optional[str], token: Optional[str] = None) -> Dict[str, Any]:
+    vk_tok = _get_vk_token(token)
+    if not vk_tok:
+        return {"error": "vkmusic: missing VK access token"}
 
     cache_key = f"vkmusic:artist:{artist_id or artist_name or ''}"
     cached = cache_get(cache_key)
@@ -1198,7 +1222,7 @@ def vk_artist_tracks(artist_id: Optional[str], artist_name: Optional[str]) -> Di
         if artist_id:
             rj = _vk_call(
                 "audio.getAudiosByArtist",
-                token=token,
+                token=vk_tok,
                 params={"artist_id": artist_id, "count": 25, "offset": 0},
             )
             items = (rj.get("response") or {}).get("items") or (rj.get("response") or [])
@@ -1208,10 +1232,13 @@ def vk_artist_tracks(artist_id: Optional[str], artist_name: Optional[str]) -> Di
                 items = []
 
             tracks = [_norm_vkmusic(x) for x in items]
-            _vk_enrich_previews_batch(tracks, token)
+            try:
+                _vk_enrich_previews_batch(tracks, vk_tok)
+            except Exception:
+                pass
 
         if not tracks and artist_name:
-            tracks = search_vkmusic(artist_name, performer_only=1)
+            tracks = search_vkmusic(artist_name, performer_only=1, token=vk_tok)
 
         payload = {
             "type": "artist",
@@ -1233,16 +1260,16 @@ def vk_artist_tracks(artist_id: Optional[str], artist_name: Optional[str]) -> Di
                 "type": "artist",
                 "source": "vkmusic",
                 "artist": {"artist_id": artist_id, "artist_name": artist_name, "image": None},
-                "tracks": search_vkmusic(artist_name, performer_only=1),
+                "tracks": search_vkmusic(artist_name, performer_only=1, token=vk_tok),
                 "warning": f"fallback_to_search: {type(e).__name__}: {e}",
             }
         return {"error": f"vkmusic artist: {type(e).__name__}: {e}"}
 
 
-def vk_playlist_album(owner_id: str, album_id: str, access_key: Optional[str] = None) -> Dict[str, Any]:
-    token = os.getenv("VKMusic_ACCESS_TOKEN")
-    if not token:
-        return {"error": "vkmusic: missing VKMusic_ACCESS_TOKEN"}
+def vk_playlist_album(owner_id: str, album_id: str, access_key: Optional[str] = None, token: Optional[str] = None) -> Dict[str, Any]:
+    vk_tok = _get_vk_token(token)
+    if not vk_tok:
+        return {"error": "vkmusic: missing VK access token"}
 
     cache_key = f"vkmusic:album:{owner_id}:{album_id}:{access_key or ''}"
     cached = cache_get(cache_key)
@@ -1383,14 +1410,14 @@ def _search_artists_spotify(q: str, limit: int) -> List[Dict[str, Any]]:
         return []
 
 
-def _search_artists_vk_hint(q: str, limit: int) -> List[Dict[str, Any]]:
-    token = os.getenv("VKMusic_ACCESS_TOKEN")
-    if not token:
+def _search_artists_vk_hint(q: str, limit: int, token: Optional[str] = None) -> List[Dict[str, Any]]:
+    vk_tok = _get_vk_token(token)
+    if not vk_tok:
         return []
     try:
         rj = _vk_call(
             "audio.search",
-            token=token,
+            token=vk_tok,
             params={
                 "q": q,
                 "count": 30,
@@ -1430,7 +1457,7 @@ def _search_artists_vk_hint(q: str, limit: int) -> List[Dict[str, Any]]:
         return []
 
 
-def search_artists_hint(service: str, q: str, limit: int = 8) -> List[Dict[str, Any]]:
+def search_artists_hint(service: str, q: str, limit: int = 8, token: Optional[str] = None) -> List[Dict[str, Any]]:
     service = (service or "").lower()
     if service in ("itunes",):
         service = "yandex"
@@ -1441,7 +1468,7 @@ def search_artists_hint(service: str, q: str, limit: int = 8) -> List[Dict[str, 
     if service == "spotify":
         return _search_artists_spotify(q, limit)
     if service == "vkmusic":
-        return _search_artists_vk_hint(q, limit)
+        return _search_artists_vk_hint(q, limit, token=token)
     return []
 
 
@@ -1451,6 +1478,7 @@ def search_enriched_v2(
     offset: int,
     limit: int,
     refresh: bool = False,
+    token: Optional[str] = None,
 ) -> Dict[str, Any]:
     service = (service or "yandex").lower()
     if service in ("itunes",):
@@ -1462,7 +1490,7 @@ def search_enriched_v2(
 
     artists: List[Dict[str, Any]] = []
     if offset == 0:
-        artists = search_artists_hint(service, q, 8)
+        artists = search_artists_hint(service, q, 8, token=token)
 
     tracks: List[Dict[str, Any]] = []
     if service in ("yandex", "yandexmusic", "ya", "itunes", ""):
@@ -1474,7 +1502,7 @@ def search_enriched_v2(
     elif service == "soundcloud":
         tracks = search_soundcloud(q, offset=offset, limit=limit, bypass_cache=refresh)
     elif service == "vkmusic":
-        tracks = search_vkmusic(q, performer_only=0, offset=offset, count=limit)
+        tracks = search_vkmusic(q, performer_only=0, offset=offset, count=limit, token=token)
     else:
         tracks = [{"error": f"Unsupported service: {service}"}]
 
@@ -1598,6 +1626,7 @@ def handler(event, context):
     # vk playlist album args
     owner_id = (params.get("owner_id", "") or "").strip() or None
     access_key = (params.get("access_key", "") or "").strip() or None
+    token_param = (_p("token") or _p("vk_token") or _p("vkmusic_token")).strip() or None
 
     try:
         # ----------------- PREVIEW -----------------
@@ -1606,7 +1635,7 @@ def handler(event, context):
                 return _response(400, {"error": "preview supported only for vkmusic"})
             if not track_id:
                 return _response(400, {"error": "Missing track_id"})
-            data = vk_preview(track_id)
+            data = vk_preview(track_id, token=token_param)
             return _response(200, data)
 
         # ----------------- SIMILAR (recommendations) -----------------
@@ -1629,7 +1658,7 @@ def handler(event, context):
             except Exception:
                 offset = 0
             refresh = (_p("refresh").lower() in ("1", "true", "yes", "y", "on"))
-            payload = search_enriched_v2(service, q, offset, limit, refresh=refresh)
+            payload = search_enriched_v2(service, q, offset, limit, refresh=refresh, token=token_param)
             return _response(200, payload)
 
         # ----------------- SEARCH (legacy: list of tracks, first page) -----------------
@@ -1644,7 +1673,7 @@ def handler(event, context):
             elif service == "soundcloud":
                 data = search_soundcloud(q, offset=0, limit=50)
             elif service == "vkmusic":
-                data = search_vkmusic(q, offset=0, count=50)
+                data = search_vkmusic(q, offset=0, count=50, token=token_param)
             else:
                 return _response(400, {"error": f"Unsupported service: {service}"})
 
