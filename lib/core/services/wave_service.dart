@@ -585,10 +585,9 @@ class WaveGenerator {
       case WaveMode.flow:
         // Personal Flow: Focus on kindred artists and collaborative discovery
         final shuffledKindred = kindredArtists.toList()..shuffle(_random);
-        searchQueries.addAll(shuffledKindred.take(3));
-        if (coreArtists.isNotEmpty) {
-          final topA = coreArtists[_random.nextInt(coreArtists.length)];
-          searchQueries.add('$topA похожие');
+        searchQueries.addAll(shuffledKindred.take(4));
+        if (searchQueries.isEmpty && coreArtists.isNotEmpty) {
+          searchQueries.addAll(coreArtists.take(2));
         }
         break;
 
@@ -668,10 +667,13 @@ class WaveGenerator {
     final similarFutures = <Future<List<Track>>>[];
     final sampledSeeds = (List<Track>.from(userFavorites)..shuffle(_random)).take(4);
     for (final seedTrack in sampledSeeds) {
-      if (seedTrack.id.isNotEmpty) {
+      final cleanId = (seedTrack.externalId ?? seedTrack.id)
+          .replaceAll(RegExp(r'^[a-zA-Z]+:'), '')
+          .trim();
+      if (cleanId.isNotEmpty) {
         similarFutures.add(
           musicService
-              .loadSimilarTracks(service: 'yandex', trackId: seedTrack.id)
+              .loadSimilarTracks(service: 'yandex', trackId: cleanId)
               .catchError((_) => <Track>[]),
         );
       }

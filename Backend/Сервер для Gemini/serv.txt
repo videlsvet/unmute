@@ -158,7 +158,7 @@ def _build_http_session() -> requests.Session:
 
 _HTTP = _build_http_session()
 
-# ===== STREAM PROXY (для SoundCloud preview) =====
+# ===== STREAM PROXY (РґР»СЏ SoundCloud preview) =====
 
 def _cors_headers_stream(extra: Optional[Dict[str, str]] = None) -> Dict[str, str]:
     h = {
@@ -199,7 +199,7 @@ def _rewrite_m3u8_playlist(text: str, base_url: str) -> str:
     for line in text.splitlines():
         line = line.strip()
 
-        # переписываем EXT-X-MAP:URI="https://...."
+        # РїРµСЂРµРїРёСЃС‹РІР°РµРј EXT-X-MAP:URI="https://...."
         if not line:
             out.append(line)
             continue
@@ -214,7 +214,7 @@ def _rewrite_m3u8_playlist(text: str, base_url: str) -> str:
 
         out.append(make_stream_proxy_url(urljoin(base_url, line)))
 
-        # URL строка (сегмент)
+        # URL СЃС‚СЂРѕРєР° (СЃРµРіРјРµРЅС‚)
     return "\n".join(out) + "\n"
 
 
@@ -287,7 +287,7 @@ def proxy_stream(url: str, event: Dict[str, Any]) -> Dict[str, Any]:
             allow_redirects=True,
         )
 
-        # ---- если это M3U8: переписываем ссылки и отдаём текстом, НЕ base64
+        # ---- РµСЃР»Рё СЌС‚Рѕ M3U8: РїРµСЂРµРїРёСЃС‹РІР°РµРј СЃСЃС‹Р»РєРё Рё РѕС‚РґР°С‘Рј С‚РµРєСЃС‚РѕРј, РќР• base64
         ct = (r.headers.get("Content-Type") or "").lower()
         if ".m3u8" in url or "application/vnd.apple.mpegurl" in ct or "application/x-mpegurl" in ct:
             text = r.text
@@ -302,7 +302,7 @@ def proxy_stream(url: str, event: Dict[str, Any]) -> Dict[str, Any]:
                 "isBase64Encoded": False,
             }
 
-        # ---- иначе это бинарь (init.mp4 / .m4s / etc)
+        # ---- РёРЅР°С‡Рµ СЌС‚Рѕ Р±РёРЅР°СЂСЊ (init.mp4 / .m4s / etc)
         content = r.content
 
         out_headers = {
@@ -389,9 +389,9 @@ def _ym_cover_to_image(cover_uri: Optional[str]) -> Optional[str]:
 
 def _norm_yandexmusic(item: Dict[str, Any]) -> Dict[str, Any]:
     """
-    Нормализуем трек Я.Музыки и ДОБАВЛЯЕМ данные для экранов:
-    - artist_id (первый артист)
-    - album_id / album_title / album_year (первый альбом)
+    РќРѕСЂРјР°Р»РёР·СѓРµРј С‚СЂРµРє РЇ.РњСѓР·С‹РєРё Рё Р”РћР‘РђР’Р›РЇР•Рњ РґР°РЅРЅС‹Рµ РґР»СЏ СЌРєСЂР°РЅРѕРІ:
+    - artist_id (РїРµСЂРІС‹Р№ Р°СЂС‚РёСЃС‚)
+    - album_id / album_title / album_year (РїРµСЂРІС‹Р№ Р°Р»СЊР±РѕРј)
     """
     artists_arr = item.get("artists", []) or []
     albums_arr = item.get("albums", []) or []
@@ -405,7 +405,7 @@ def _norm_yandexmusic(item: Dict[str, Any]) -> Dict[str, Any]:
     album_year = album0.get("year") if album0 else None
     album_cover = album0.get("coverUri") if album0 else None
 
-    # в приоритете обложка альбома, потом coverUri трека
+    # РІ РїСЂРёРѕСЂРёС‚РµС‚Рµ РѕР±Р»РѕР¶РєР° Р°Р»СЊР±РѕРјР°, РїРѕС‚РѕРј coverUri С‚СЂРµРєР°
     cover_uri = album_cover or item.get("coverUri")
     image = _ym_cover_to_image(cover_uri)
 
@@ -459,14 +459,14 @@ def _get_yandex_stream(track_id: int, token: str) -> Optional[str]:
         if not infos:
             return None
 
-# 🔥 выбираем именно mp3, а не первый попавшийся
+# рџ”Ґ РІС‹Р±РёСЂР°РµРј РёРјРµРЅРЅРѕ mp3, Р° РЅРµ РїРµСЂРІС‹Р№ РїРѕРїР°РІС€РёР№СЃСЏ
         pick = None
         for it in infos:
             if (it.get("codec") or "").lower() == "mp3":
                 pick = it
                 break
 
-# fallback — если mp3 вдруг нет
+# fallback вЂ” РµСЃР»Рё mp3 РІРґСЂСѓРі РЅРµС‚
         pick = pick or infos[0]
 
         download_info_url = pick.get("downloadInfoUrl")
@@ -480,7 +480,7 @@ def _get_yandex_stream(track_id: int, token: str) -> Optional[str]:
         elif download_info_url.startswith("/"):
             download_info_url = "https://api.music.yandex.net" + download_info_url
 
-        # downloadInfoUrl обычно не требует OAuth
+        # downloadInfoUrl РѕР±С‹С‡РЅРѕ РЅРµ С‚СЂРµР±СѓРµС‚ OAuth
         xml_resp = requests.get(
             download_info_url,
             timeout=_CFG.http_timeout_s,
@@ -545,7 +545,7 @@ def search_yandexmusic(q: str, page: int = 0, page_size: int = 50) -> List[Dict[
 
 def yandex_album_with_tracks(album_id: str) -> Dict[str, Any]:
     """
-    Возвращает:
+    Р’РѕР·РІСЂР°С‰Р°РµС‚:
     {
       "type": "album",
       "source": "yandex",
@@ -576,7 +576,7 @@ def yandex_album_with_tracks(album_id: str) -> Dict[str, Any]:
 
         # album meta
         album_meta = result.get("album") or result.get("result") or result.get("album") or {}
-        # иногда album_meta может быть прямо в result (в зависимости от версии)
+        # РёРЅРѕРіРґР° album_meta РјРѕР¶РµС‚ Р±С‹С‚СЊ РїСЂСЏРјРѕ РІ result (РІ Р·Р°РІРёСЃРёРјРѕСЃС‚Рё РѕС‚ РІРµСЂСЃРёРё)
         if not album_meta and isinstance(result, dict):
             # try best-effort:
             album_meta = result.get("album") or result
@@ -586,7 +586,7 @@ def yandex_album_with_tracks(album_id: str) -> Dict[str, Any]:
         image = _ym_cover_to_image(cover_uri)
         year = album_meta.get("year")
 
-        # tracks: обычно volumes: [[track, track], [track...]]
+        # tracks: РѕР±С‹С‡РЅРѕ volumes: [[track, track], [track...]]
         volumes = result.get("volumes") or []
         tracks_out: List[Dict[str, Any]] = []
 
@@ -601,7 +601,7 @@ def yandex_album_with_tracks(album_id: str) -> Dict[str, Any]:
                 item = _norm_yandexmusic(track)
                 if item.get("id"):
                     item["preview"] = _get_yandex_stream(item["id"], token)
-                # если вдруг альбомных полей нет в треке — подставим
+                # РµСЃР»Рё РІРґСЂСѓРі Р°Р»СЊР±РѕРјРЅС‹С… РїРѕР»РµР№ РЅРµС‚ РІ С‚СЂРµРєРµ вЂ” РїРѕРґСЃС‚Р°РІРёРј
                 item["album_id"] = item.get("album_id") or str(album_id_int)
                 item["album_title"] = item.get("album_title") or album_title
                 item["album_year"] = item.get("album_year") or year
@@ -630,12 +630,12 @@ def yandex_album_with_tracks(album_id: str) -> Dict[str, Any]:
 
 def yandex_artist_top_tracks(artist_id: str, fallback_name: Optional[str] = None) -> Dict[str, Any]:
     """
-    MVP: отдаём топ треки артиста.
-    Схема:
-    - /artists/{id}/brief-info (для меты)
-    - /artists/{id}/track-ids-by-rating -> берём id треков
-    - /tracks?trackIds=... -> получаем треки
-    Если что-то не вышло — fallback на search по имени.
+    MVP: РѕС‚РґР°С‘Рј С‚РѕРї С‚СЂРµРєРё Р°СЂС‚РёСЃС‚Р°.
+    РЎС…РµРјР°:
+    - /artists/{id}/brief-info (РґР»СЏ РјРµС‚С‹)
+    - /artists/{id}/track-ids-by-rating -> Р±РµСЂС‘Рј id С‚СЂРµРєРѕРІ
+    - /tracks?trackIds=... -> РїРѕР»СѓС‡Р°РµРј С‚СЂРµРєРё
+    Р•СЃР»Рё С‡С‚Рѕ-С‚Рѕ РЅРµ РІС‹С€Р»Рѕ вЂ” fallback РЅР° search РїРѕ РёРјРµРЅРё.
     """
     cache_key = f"yandexmusic:artist:{artist_id}"
     cached = cache_get(cache_key)
@@ -675,7 +675,7 @@ def yandex_artist_top_tracks(artist_id: str, fallback_name: Optional[str] = None
 
         tracks_raw: List[Dict[str, Any]] = []
         if track_ids:
-            # попытка получить пачкой
+            # РїРѕРїС‹С‚РєР° РїРѕР»СѓС‡РёС‚СЊ РїР°С‡РєРѕР№
             try:
                 tracks_json = _ym_request(
                     "https://api.music.yandex.net/tracks",
@@ -697,9 +697,9 @@ def yandex_artist_top_tracks(artist_id: str, fallback_name: Optional[str] = None
                 item["preview"] = _get_yandex_stream(item["id"], token)
             tracks_out.append(item)
 
-        # fallback если пусто
+        # fallback РµСЃР»Рё РїСѓСЃС‚Рѕ
         if not tracks_out and fallback_name:
-            tracks_out = search_yandexmusic(fallback_name, page=0, page_size=50)  # уже нормализовано + preview
+            tracks_out = search_yandexmusic(fallback_name, page=0, page_size=50)  # СѓР¶Рµ РЅРѕСЂРјР°Р»РёР·РѕРІР°РЅРѕ + preview
 
         # artist meta normalize
         artist_name = None
@@ -727,7 +727,7 @@ def yandex_artist_top_tracks(artist_id: str, fallback_name: Optional[str] = None
         return payload
 
     except Exception as e:
-        # fallback на поиск по имени
+        # fallback РЅР° РїРѕРёСЃРє РїРѕ РёРјРµРЅРё
         if fallback_name:
             return {
                 "type": "artist",
@@ -777,7 +777,7 @@ def yandex_similar_tracks(track_id: str) -> List[Dict[str, Any]]:
 
 
 # ======================================================================================
-# ===== Spotify (как было) ==============================================================
+# ===== Spotify (РєР°Рє Р±С‹Р»Рѕ) ==============================================================
 # ======================================================================================
 
 def _norm_spotify(item: Dict[str, Any]) -> Dict[str, Any]:
@@ -840,7 +840,7 @@ def search_spotify(q: str, offset: int = 0, limit: int = 50) -> List[Dict[str, A
 
 
 # ======================================================================================
-# ===== SoundCloud (как было) ===========================================================
+# ===== SoundCloud (РєР°Рє Р±С‹Р»Рѕ) ===========================================================
 # ======================================================================================
 
 def _resolve_soundcloud_stream(api_url: str, client_id: str) -> Optional[str]:
@@ -860,7 +860,7 @@ def _resolve_soundcloud_stream(api_url: str, client_id: str) -> Optional[str]:
         return None
 
 def make_stream_proxy_url(real_url: str) -> str:
-    # отдаём клиенту ссылку на наш backend, а не прямой playback/cf-media
+    # РѕС‚РґР°С‘Рј РєР»РёРµРЅС‚Сѓ СЃСЃС‹Р»РєСѓ РЅР° РЅР°С€ backend, Р° РЅРµ РїСЂСЏРјРѕР№ playback/cf-media
     return f"{_CFG.api_base_url}?type=stream&u={_strict_quote_url(real_url)}"
     
 def make_img_proxy_url(real_url: str) -> str:
@@ -940,7 +940,7 @@ def search_soundcloud(
             proxies=proxies,
             headers=headers,
         )
-        # если 403 — покажем кусок тела, иногда там причина
+        # РµСЃР»Рё 403 вЂ” РїРѕРєР°Р¶РµРј РєСѓСЃРѕРє С‚РµР»Р°, РёРЅРѕРіРґР° С‚Р°Рј РїСЂРёС‡РёРЅР°
         if r.status_code != 200:
             return [{
                 "error": f"soundcloud: HTTP {r.status_code}",
@@ -1011,7 +1011,7 @@ def _vk_audio_key(owner_id: Any, audio_id: Any, access_key: Optional[str]) -> Op
     if owner_id is None or audio_id is None:
         return None
     s = f"{owner_id}_{audio_id}"
-    # access_key в VK бывает нужен, но не всегда есть
+    # access_key РІ VK Р±С‹РІР°РµС‚ РЅСѓР¶РµРЅ, РЅРѕ РЅРµ РІСЃРµРіРґР° РµСЃС‚СЊ
     if access_key:
         s = f"{s}_{access_key}"
     return s
@@ -1024,7 +1024,7 @@ def _norm_vkmusic(item: Dict[str, Any]) -> Dict[str, Any]:
     artist = item.get("artist")
     title = item.get("title")
     duration = item.get("duration")
-    url = item.get("url")  # может быть None
+    url = item.get("url")  # РјРѕР¶РµС‚ Р±С‹С‚СЊ None
 
     owner_id = item.get("owner_id")
     audio_id = item.get("id")
@@ -1043,17 +1043,17 @@ def _norm_vkmusic(item: Dict[str, Any]) -> Dict[str, Any]:
 
         image = _vk_pick_image_from_album(alb) or image
 
-        # иногда в album лежат owner_id/access_key плейлиста — НЕ перетираем track access_key,
-        # но owner_id можно уточнить если у трека его нет
+        # РёРЅРѕРіРґР° РІ album Р»РµР¶Р°С‚ owner_id/access_key РїР»РµР№Р»РёСЃС‚Р° вЂ” РќР• РїРµСЂРµС‚РёСЂР°РµРј track access_key,
+        # РЅРѕ owner_id РјРѕР¶РЅРѕ СѓС‚РѕС‡РЅРёС‚СЊ РµСЃР»Рё Сѓ С‚СЂРµРєР° РµРіРѕ РЅРµС‚
         owner_id = owner_id if owner_id is not None else alb.get("owner_id") or owner_id
-        # access_key трека важнее, чем access_key плейлиста
+        # access_key С‚СЂРµРєР° РІР°Р¶РЅРµРµ, С‡РµРј access_key РїР»РµР№Р»РёСЃС‚Р°
         access_key = access_key or alb.get("access_key") or access_key
 
     return {
         "title": title,
         "artist": artist,
         "image": image,
-        "preview": url,  # тут может быть None — позже обогатим через getById
+        "preview": url,  # С‚СѓС‚ РјРѕР¶РµС‚ Р±С‹С‚СЊ None вЂ” РїРѕР·Р¶Рµ РѕР±РѕРіР°С‚РёРј С‡РµСЂРµР· getById
         "duration": int(duration or 0),
         "source": "vkmusic",
 
@@ -1062,7 +1062,7 @@ def _norm_vkmusic(item: Dict[str, Any]) -> Dict[str, Any]:
         "audio_id": audio_id,
         "access_key": access_key,
 
-        # album extras (если есть)
+        # album extras (РµСЃР»Рё РµСЃС‚СЊ)
         "album_id": str(album_id) if album_id is not None else None,
         "album_title": album_title,
         "album_year": album_year,
@@ -1073,10 +1073,10 @@ def _norm_vkmusic(item: Dict[str, Any]) -> Dict[str, Any]:
 
 def _vk_enrich_previews_batch(tracks: List[Dict[str, Any]], token: str) -> None:
     """
-    Обогащает tracks: проставляет preview через audio.getById (одним батч-запросом).
-    Меняет список inplace.
+    РћР±РѕРіР°С‰Р°РµС‚ tracks: РїСЂРѕСЃС‚Р°РІР»СЏРµС‚ preview С‡РµСЂРµР· audio.getById (РѕРґРЅРёРј Р±Р°С‚С‡-Р·Р°РїСЂРѕСЃРѕРј).
+    РњРµРЅСЏРµС‚ СЃРїРёСЃРѕРє inplace.
     """
-    # соберём ключи тех, у кого preview пустой
+    # СЃРѕР±РµСЂС‘Рј РєР»СЋС‡Рё С‚РµС…, Сѓ РєРѕРіРѕ preview РїСѓСЃС‚РѕР№
     keys = []
     key_to_index = {}
 
@@ -1092,7 +1092,7 @@ def _vk_enrich_previews_batch(tracks: List[Dict[str, Any]], token: str) -> None:
     if not keys:
         return
 
-    # VK принимает до нескольких сотен id за раз, но на всякий случай режем
+    # VK РїСЂРёРЅРёРјР°РµС‚ РґРѕ РЅРµСЃРєРѕР»СЊРєРёС… СЃРѕС‚РµРЅ id Р·Р° СЂР°Р·, РЅРѕ РЅР° РІСЃСЏРєРёР№ СЃР»СѓС‡Р°Р№ СЂРµР¶РµРј
     CHUNK = 100
     for start in range(0, len(keys), CHUNK):
         part = keys[start:start + CHUNK]
@@ -1110,7 +1110,7 @@ def _vk_enrich_previews_batch(tracks: List[Dict[str, Any]], token: str) -> None:
                 akey = it.get("access_key")
                 url = it.get("url")
 
-                # пробуем сопоставить: сначала с access_key, потом без
+                # РїСЂРѕР±СѓРµРј СЃРѕРїРѕСЃС‚Р°РІРёС‚СЊ: СЃРЅР°С‡Р°Р»Р° СЃ access_key, РїРѕС‚РѕРј Р±РµР·
                 k1 = _vk_audio_key(oid, aid, akey)
                 k2 = _vk_audio_key(oid, aid, None)
 
@@ -1123,11 +1123,11 @@ def _vk_enrich_previews_batch(tracks: List[Dict[str, Any]], token: str) -> None:
                 if idx is not None and url:
                     tracks[idx]["preview"] = url
 
-                    # если access_key вдруг появился — сохраним
+                    # РµСЃР»Рё access_key РІРґСЂСѓРі РїРѕСЏРІРёР»СЃСЏ вЂ” СЃРѕС…СЂР°РЅРёРј
                     if akey and not tracks[idx].get("access_key"):
                         tracks[idx]["access_key"] = akey
 
-                    # иногда у getById можно вытащить обложку
+                    # РёРЅРѕРіРґР° Сѓ getById РјРѕР¶РЅРѕ РІС‹С‚Р°С‰РёС‚СЊ РѕР±Р»РѕР¶РєСѓ
                     if not tracks[idx].get("image") and isinstance(it.get("album"), dict):
                         tracks[idx]["image"] = _vk_pick_image_from_album(it["album"]) or tracks[idx].get("image")
 
@@ -1601,17 +1601,17 @@ def handler(event, context):
     track_id = _p("track_id")
 
 
-    # ✅ STREAM endpoint
+    # вњ… STREAM endpoint
     if req_type == "stream":
         return proxy_stream(stream_url, event)
     
     img_url = _p("u")
 
-    # ✅ IMAGE endpoint (обложки через прокси)
+    # вњ… IMAGE endpoint (РѕР±Р»РѕР¶РєРё С‡РµСЂРµР· РїСЂРѕРєСЃРё)
     if req_type == "img":
         return proxy_image(img_url, raw_mode=False)
 
-    # ✅ IMAGE endpoint (raw intent; transport remains base64 for gateway)
+    # вњ… IMAGE endpoint (raw intent; transport remains base64 for gateway)
     if req_type == "img_raw":
         return proxy_image(img_url, raw_mode=True)
 
@@ -1707,12 +1707,12 @@ def handler(event, context):
 
             # Yandex
             if service in ("yandex", "yandexmusic", "ya", "itunes", ""):
-                # можно передать artist_id или имя
+                # РјРѕР¶РЅРѕ РїРµСЂРµРґР°С‚СЊ artist_id РёР»Рё РёРјСЏ
                 if not artist_id and not artist_name and not q:
                     return _response(400, {"error": "Missing artist_id or artist_name (or q as fallback)"})
                 fallback_name = artist_name or q
                 if not artist_id:
-                    # нет id -> просто поиск
+                    # РЅРµС‚ id -> РїСЂРѕСЃС‚Рѕ РїРѕРёСЃРє
                     return _response(200, {
                         "type": "artist",
                         "source": "yandex",
@@ -1725,7 +1725,7 @@ def handler(event, context):
 
             # VK
             if service == "vkmusic":
-                # поддерживаем: artist_id или artist_name/q
+                # РїРѕРґРґРµСЂР¶РёРІР°РµРј: artist_id РёР»Рё artist_name/q
                 name = artist_name or q
                 if not artist_id and not name:
                     return _response(400, {"error": "Missing artist_id or artist_name (or q as fallback)"})
