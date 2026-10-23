@@ -158,8 +158,8 @@ class AlbumResult {
 class MusicService {
   Future<dynamic> _fetchWithFallback(Map<String, String> params) async {
     final endpoints = [
-      AppConfig.apiGatewayUrl,
       AppConfig.searchBaseUrl,
+      AppConfig.apiGatewayUrl,
     ];
 
     Object? lastError;

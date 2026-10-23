@@ -505,6 +505,13 @@ class WaveGenerator {
     int amount = 30,
     WaveMode mode = WaveMode.flow,
   }) async {
+    if (_sessionPlayedKeys.length > 60) {
+      final keep = _sessionPlayedKeys.skip(_sessionPlayedKeys.length - 20).toList();
+      _sessionPlayedKeys
+        ..clear()
+        ..addAll(keep);
+    }
+
     final topStoredArtists = await store.topArtists(12);
     final historySet = await store.historyKeysLast(150);
 
@@ -679,17 +686,25 @@ class WaveGenerator {
       }
     }
 
-    final searchResults = await Future.wait(searchFutures).timeout(
-      const Duration(milliseconds: 3200),
-      onTimeout: () => <List<Track>>[],
+    final searchResults = await Future.wait(
+      searchFutures.map(
+        (f) => f.timeout(
+          const Duration(seconds: 8),
+          onTimeout: () => <Track>[],
+        ),
+      ),
     );
     for (final list in searchResults) {
       rawCandidates.addAll(list);
     }
 
-    final similarResults = await Future.wait(similarFutures).timeout(
-      const Duration(milliseconds: 3000),
-      onTimeout: () => <List<Track>>[],
+    final similarResults = await Future.wait(
+      similarFutures.map(
+        (f) => f.timeout(
+          const Duration(seconds: 8),
+          onTimeout: () => <Track>[],
+        ),
+      ),
     );
     for (final list in similarResults) {
       rawCandidates.addAll(list);
@@ -698,7 +713,7 @@ class WaveGenerator {
     if (serverWaveFuture != null) {
       try {
         final serverTracks = await serverWaveFuture.timeout(
-          const Duration(milliseconds: 2000),
+          const Duration(seconds: 6),
           onTimeout: () => <Track>[],
         );
         rawCandidates.addAll(serverTracks);
@@ -730,6 +745,29 @@ class WaveGenerator {
 
       seenKeys.add(k);
       candidateSet.add(tr);
+    }
+
+    // Relaxed pass: if candidateSet is empty, backfill from rawCandidates ignoring history/session exclusions
+    if (candidateSet.isEmpty) {
+      for (final tr in rawCandidates) {
+        if (!tr.hasPlayableUrl) continue;
+        final k = store.makeTrackKey(tr.artist, tr.title);
+        if (k.isEmpty || seenKeys.contains(k)) continue;
+        if (await store.isDisliked(k)) continue;
+        seenKeys.add(k);
+        candidateSet.add(tr);
+      }
+    }
+
+    // Still empty: fallback to user favorites if available
+    if (candidateSet.isEmpty && userFavorites.isNotEmpty) {
+      for (final tr in userFavorites) {
+        if (!tr.hasPlayableUrl) continue;
+        final k = store.makeTrackKey(tr.artist, tr.title);
+        if (k.isEmpty || seenKeys.contains(k)) continue;
+        seenKeys.add(k);
+        candidateSet.add(tr);
+      }
     }
 
     if (candidateSet.isEmpty) {
@@ -837,10 +875,12 @@ class WaveGenerator {
     ];
 
     final results = await Future.wait(
-      popularQueries.map((q) => _safeSearch(q, 'yandex')),
-    ).timeout(
-      const Duration(milliseconds: 3000),
-      onTimeout: () => <List<Track>>[],
+      popularQueries.map(
+        (q) => _safeSearch(q, 'yandex').timeout(
+          const Duration(seconds: 8),
+          onTimeout: () => <Track>[],
+        ),
+      ),
     );
 
     final candidates = <Track>[];
@@ -849,12 +889,35 @@ class WaveGenerator {
     }
 
     final valid = candidates.where((t) => t.hasPlayableUrl).toList();
-    valid.shuffle(_random);
-    final result = _enforceAntiFatigue(valid, amount);
-    for (final t in result) {
-      _sessionPlayedKeys.add(store.makeTrackKey(t.artist, t.title));
+    if (valid.isNotEmpty) {
+      valid.shuffle(_random);
+      final result = _enforceAntiFatigue(valid, amount);
+      for (final t in result) {
+        _sessionPlayedKeys.add(store.makeTrackKey(t.artist, t.title));
+      }
+      return result;
     }
-    return result;
+
+    // Safety net: if online cold start is empty, fallback to favorites if user has any
+    if (authService != null) {
+      try {
+        final token = await authService!.getSavedToken();
+        if (token != null && token.isNotEmpty) {
+          final favs = await authService!.listFavorites(token);
+          final validFavs = favs.where((t) => t.hasPlayableUrl).toList();
+          if (validFavs.isNotEmpty) {
+            validFavs.shuffle(_random);
+            final result = _enforceAntiFatigue(validFavs, amount);
+            for (final t in result) {
+              _sessionPlayedKeys.add(store.makeTrackKey(t.artist, t.title));
+            }
+            return result;
+          }
+        }
+      } catch (_) {}
+    }
+
+    return const [];
   }
 
   Future<List<Track>> _safeSearch(String query, String service) async {
@@ -908,10 +971,15 @@ class WaveController extends ChangeNotifier {
     notifyListeners();
 
     try {
-      final tracks = await generator.generate(
+      var tracks = await generator.generate(
         amount: 30,
         mode: mode,
       );
+
+      if (tracks.isEmpty) {
+        // Direct fallback attempt: popular tracks
+        tracks = await generator.generateColdStart(20);
+      }
 
       if (tracks.isEmpty) {
         statusMessage = 'Не удалось найти треки для волны';
