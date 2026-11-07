@@ -3,17 +3,17 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 
 class AppTheme {
-  static const Color background = Color(0xFF000000);
-  static const Color backgroundElevated = Color(0xFF090909);
-  static const Color surface = Color(0xFF121212);
-  static const Color surfaceSoft = Color(0xFF181818);
+  static const Color background = Color(0xFF0C0D12);
+  static const Color backgroundElevated = Color(0xFF11131B);
+  static const Color surface = Color(0xFF181B25);
+  static const Color surfaceSoft = Color(0xFF202432);
   static const Color surfaceMuted = Color(0xFF242424);
   static const Color surfaceRaised = Color(0xFF303030);
   static const Color surfaceHighest = Color(0xFF383838);
   static const Color stroke = Color(0xFF282828);
   static const Color strokeSoft = Color(0xFF3A3A3A);
-  static const Color accent = Color(0xFF1ED760);
-  static const Color accent2 = Color(0xFF00E5FF);
+  static const Color accent = Color(0xFF9CADFF);
+  static const Color accent2 = Color(0xFF80D9D0);
   static const Color accentWarm = Color(0xFFFF4D6D);
   static const Color accentAmber = Color(0xFFFFB703);
   static const Color accentPurple = Color(0xFFA855F7);
@@ -23,9 +23,9 @@ class AppTheme {
   static const Color danger = Color(0xFFFF5A5F);
 
   static const double radiusSm = 6;
-  static const double radiusMd = 10;
-  static const double radiusLg = 14;
-  static const double radiusXl = 18;
+  static const double radiusMd = 16;
+  static const double radiusLg = 22;
+  static const double radiusXl = 28;
 
   static List<BoxShadow> premiumShadow({Color? color, double alpha = 0.18}) {
     return [
@@ -213,7 +213,8 @@ class AppTheme {
           ),
           foregroundColor: WidgetStateProperty.all(textPrimary),
           shape: WidgetStateProperty.all(
-            RoundedRectangleBorder(borderRadius: BorderRadius.circular(radiusLg)),
+            RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(radiusLg)),
           ),
         ),
       ),
@@ -231,7 +232,8 @@ class AppTheme {
             return const BorderSide(color: stroke);
           }),
           shape: WidgetStateProperty.all(
-            RoundedRectangleBorder(borderRadius: BorderRadius.circular(radiusLg)),
+            RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(radiusLg)),
           ),
           backgroundColor: WidgetStateProperty.resolveWith((states) {
             if (states.contains(WidgetState.hovered)) {
@@ -245,7 +247,8 @@ class AppTheme {
         style: ButtonStyle(
           foregroundColor: WidgetStateProperty.all(textSecondary),
           shape: WidgetStateProperty.all(
-            RoundedRectangleBorder(borderRadius: BorderRadius.circular(radiusMd)),
+            RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(radiusMd)),
           ),
         ),
       ),
@@ -253,11 +256,13 @@ class AppTheme {
         backgroundColor: surfaceSoft,
         contentTextStyle: const TextStyle(color: textPrimary),
         behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(radiusLg)),
+        shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(radiusLg)),
       ),
       dialogTheme: DialogThemeData(
         backgroundColor: surface,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(radiusXl)),
+        shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(radiusXl)),
       ),
       dropdownMenuTheme: DropdownMenuThemeData(
         menuStyle: MenuStyle(

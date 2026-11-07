@@ -1,3 +1,4 @@
+import '../../core/services/wave_service.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -29,6 +30,9 @@ class ProfilePage extends StatefulWidget {
 }
 
 class _ProfilePageState extends State<ProfilePage> {
+  final _artistsController = TextEditingController();
+  final _waveStore = WaveProfileStore();
+  bool _savingArtists = false;
   final _avatarController = TextEditingController();
   final _spotifyIdController = TextEditingController();
   final _spotifySecretController = TextEditingController();
@@ -47,10 +51,14 @@ class _ProfilePageState extends State<ProfilePage> {
   void initState() {
     super.initState();
     _load();
+    _waveStore.favoriteArtists().then((artists) {
+      if (mounted) setState(() => _artistsController.text = artists.join(", "));
+    });
   }
 
   @override
   void dispose() {
+    _artistsController.dispose();
     _avatarController.dispose();
     _spotifyIdController.dispose();
     _spotifySecretController.dispose();
@@ -155,6 +163,66 @@ class _ProfilePageState extends State<ProfilePage> {
     }
   }
 
+  Widget _favoriteArtistsCard() => Padding(
+        padding: const EdgeInsets.symmetric(vertical: 16),
+        child: PremiumPanel(
+          padding: const EdgeInsets.all(20),
+          child:
+              Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            const Icon(Icons.auto_awesome_rounded, color: AppTheme.accent),
+            const SizedBox(height: 12),
+            Text('Ваш музыкальный мир',
+                style: Theme.of(context).textTheme.titleLarge),
+            const SizedBox(height: 8),
+            const Text(
+                'Любимые исполнители помогут настроить Мою волну. Настройка сохраняется на этом устройстве.'),
+            const SizedBox(height: 16),
+            TextField(
+                controller: _artistsController,
+                maxLength: 600,
+                maxLines: 3,
+                decoration: const InputDecoration(
+                    labelText: 'Любимые исполнители',
+                    hintText: 'Например: Кино, Земфира, Radiohead',
+                    helperText: 'До 12 исполнителей через запятую')),
+            const SizedBox(height: 12),
+            FilledButton.icon(
+              icon: const Icon(Icons.check_rounded),
+              label: Text(_savingArtists ? 'Сохраняем…' : 'Настроить волну'),
+              onPressed: _savingArtists
+                  ? null
+                  : () async {
+                      final artists = _artistsController.text
+                          .split(RegExp(r'[,;\n]'))
+                          .map((s) => s.trim())
+                          .where((s) => s.isNotEmpty)
+                          .toSet()
+                          .take(12)
+                          .toList();
+                      setState(() => _savingArtists = true);
+                      try {
+                        await _waveStore.saveFavoriteArtists(artists);
+                        if (!mounted) return;
+                        _artistsController.text = artists.join(', ');
+                        ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                                content: Text(
+                                    'Вкусы сохранены. Запустите Мою волну.')));
+                      } catch (_) {
+                        if (mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+                              content: Text(
+                                  'Не удалось сохранить. Попробуйте ещё раз.')));
+                        }
+                      } finally {
+                        if (mounted) setState(() => _savingArtists = false);
+                      }
+                    },
+            ),
+          ]),
+        ),
+      );
+
   void _toggleVisibility(String key) {
     setState(() {
       if (_visibleSecrets.contains(key)) {
@@ -217,7 +285,8 @@ class _ProfilePageState extends State<ProfilePage> {
         children: [
           AppHeader(
             title: 'Профиль',
-            subtitle: 'Аккаунт, аватар и ключи сервисов с более безопасным редактированием и понятными статусами.',
+            subtitle:
+                'Аккаунт, аватар и ключи сервисов с более безопасным редактированием и понятными статусами.',
             trailing: Wrap(
               spacing: 12,
               runSpacing: 12,
@@ -240,6 +309,7 @@ class _ProfilePageState extends State<ProfilePage> {
             child: SingleChildScrollView(
               child: Column(
                 children: [
+                  _favoriteArtistsCard(),
                   PremiumPanel(
                     padding: const EdgeInsets.all(22),
                     child: Row(
@@ -256,7 +326,8 @@ class _ProfilePageState extends State<ProfilePage> {
                             children: [
                               Text(
                                 profile.nickname,
-                                style: Theme.of(context).textTheme.headlineMedium,
+                                style:
+                                    Theme.of(context).textTheme.headlineMedium,
                               ),
                               const SizedBox(height: 8),
                               Text(
@@ -289,7 +360,8 @@ class _ProfilePageState extends State<ProfilePage> {
                   const SizedBox(height: 18),
                   _SectionCard(
                     title: 'Аватар',
-                    subtitle: 'Используй прямую ссылку на изображение и настраивай аватар как часть продукта, а не как сухую форму настроек.',
+                    subtitle:
+                        'Используй прямую ссылку на изображение и настраивай аватар как часть продукта, а не как сухую форму настроек.',
                     child: Column(
                       children: [
                         TextField(
@@ -308,7 +380,8 @@ class _ProfilePageState extends State<ProfilePage> {
                                 ? const SizedBox(
                                     width: 16,
                                     height: 16,
-                                    child: CircularProgressIndicator(strokeWidth: 2),
+                                    child: CircularProgressIndicator(
+                                        strokeWidth: 2),
                                   )
                                 : const Icon(Icons.image_outlined),
                             label: const Text('Сохранить аватар'),
@@ -320,47 +393,58 @@ class _ProfilePageState extends State<ProfilePage> {
                   const SizedBox(height: 18),
                   _SectionCard(
                     title: 'Ключи сервисов',
-                    subtitle: 'Показывай, скрывай и копируй значения без ощущения сырой технической формы.',
+                    subtitle:
+                        'Показывай, скрывай и копируй значения без ощущения сырой технической формы.',
                     child: Column(
                       children: [
                         _SecretField(
                           label: 'Spotify Client ID',
                           controller: _spotifyIdController,
                           visible: _visibleSecrets.contains('spotify_id'),
-                          onToggleVisibility: () => _toggleVisibility('spotify_id'),
-                          onCopy: () => _copy(_spotifyIdController.text, 'Spotify Client ID'),
+                          onToggleVisibility: () =>
+                              _toggleVisibility('spotify_id'),
+                          onCopy: () => _copy(
+                              _spotifyIdController.text, 'Spotify Client ID'),
                         ),
                         const SizedBox(height: 12),
                         _SecretField(
                           label: 'Spotify Client Secret',
                           controller: _spotifySecretController,
                           visible: _visibleSecrets.contains('spotify_secret'),
-                          onToggleVisibility: () => _toggleVisibility('spotify_secret'),
-                          onCopy: () => _copy(_spotifySecretController.text, 'Spotify Client Secret'),
+                          onToggleVisibility: () =>
+                              _toggleVisibility('spotify_secret'),
+                          onCopy: () => _copy(_spotifySecretController.text,
+                              'Spotify Client Secret'),
                         ),
                         const SizedBox(height: 12),
                         _SecretField(
                           label: 'SoundCloud Client ID',
                           controller: _soundcloudIdController,
                           visible: _visibleSecrets.contains('soundcloud_id'),
-                          onToggleVisibility: () => _toggleVisibility('soundcloud_id'),
-                          onCopy: () => _copy(_soundcloudIdController.text, 'SoundCloud Client ID'),
+                          onToggleVisibility: () =>
+                              _toggleVisibility('soundcloud_id'),
+                          onCopy: () => _copy(_soundcloudIdController.text,
+                              'SoundCloud Client ID'),
                         ),
                         const SizedBox(height: 12),
                         _SecretField(
                           label: 'Yandex Token',
                           controller: _yandexTokenController,
                           visible: _visibleSecrets.contains('yandex_token'),
-                          onToggleVisibility: () => _toggleVisibility('yandex_token'),
-                          onCopy: () => _copy(_yandexTokenController.text, 'Yandex Token'),
+                          onToggleVisibility: () =>
+                              _toggleVisibility('yandex_token'),
+                          onCopy: () => _copy(
+                              _yandexTokenController.text, 'Yandex Token'),
                         ),
                         const SizedBox(height: 12),
                         _SecretField(
                           label: 'VK Music Token',
                           controller: _vkMusicTokenController,
                           visible: _visibleSecrets.contains('vkmusic_token'),
-                          onToggleVisibility: () => _toggleVisibility('vkmusic_token'),
-                          onCopy: () => _copy(_vkMusicTokenController.text, 'VK Music Token'),
+                          onToggleVisibility: () =>
+                              _toggleVisibility('vkmusic_token'),
+                          onCopy: () => _copy(
+                              _vkMusicTokenController.text, 'VK Music Token'),
                         ),
                         const SizedBox(height: 16),
                         Align(
@@ -371,7 +455,8 @@ class _ProfilePageState extends State<ProfilePage> {
                                 ? const SizedBox(
                                     width: 16,
                                     height: 16,
-                                    child: CircularProgressIndicator(strokeWidth: 2),
+                                    child: CircularProgressIndicator(
+                                        strokeWidth: 2),
                                   )
                                 : const Icon(Icons.vpn_key_outlined),
                             label: const Text('Сохранить ключи сервисов'),
@@ -400,6 +485,7 @@ class _ProfilePageState extends State<ProfilePage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            _favoriteArtistsCard(),
             Row(
               children: [
                 ClipOval(
@@ -512,14 +598,16 @@ class _ProfilePageState extends State<ProfilePage> {
                     label: 'Spotify Client Secret',
                     controller: _spotifySecretController,
                     visible: _visibleSecrets.contains('spotify_secret'),
-                    onToggleVisibility: () => _toggleVisibility('spotify_secret'),
+                    onToggleVisibility: () =>
+                        _toggleVisibility('spotify_secret'),
                   ),
                   const SizedBox(height: 10),
                   _MobileSecretField(
                     label: 'SoundCloud Client ID',
                     controller: _soundcloudIdController,
                     visible: _visibleSecrets.contains('soundcloud_id'),
-                    onToggleVisibility: () => _toggleVisibility('soundcloud_id'),
+                    onToggleVisibility: () =>
+                        _toggleVisibility('soundcloud_id'),
                   ),
                   const SizedBox(height: 10),
                   _MobileSecretField(
@@ -533,7 +621,8 @@ class _ProfilePageState extends State<ProfilePage> {
                     label: 'VK Music Token',
                     controller: _vkMusicTokenController,
                     visible: _visibleSecrets.contains('vkmusic_token'),
-                    onToggleVisibility: () => _toggleVisibility('vkmusic_token'),
+                    onToggleVisibility: () =>
+                        _toggleVisibility('vkmusic_token'),
                   ),
                   const SizedBox(height: 16),
                   SizedBox(
@@ -679,7 +768,8 @@ class _SecretField extends StatelessWidget {
                 ),
               ),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                 decoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(14),
                   color: filled
@@ -711,7 +801,9 @@ class _SecretField extends StatelessWidget {
                   IconButton(
                     onPressed: onToggleVisibility,
                     icon: Icon(
-                      visible ? Icons.visibility_off_rounded : Icons.visibility_rounded,
+                      visible
+                          ? Icons.visibility_off_rounded
+                          : Icons.visibility_rounded,
                     ),
                   ),
                 ],

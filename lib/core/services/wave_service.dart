@@ -106,12 +106,12 @@ bool _containsVersionWords(String x) {
 // ══════════════════════════════════════════════════════════════
 
 enum WaveMode {
-  flow,        // Моя Волна (персональный сбалансированный поток)
+  flow, // Моя Волна (персональный сбалансированный поток)
   exploration, // Открытия (незнакомое, свежие находки)
-  favorites,   // Любимое (золотая коллекция пользователя)
-  energy,      // Драйв (бодрое, танцевальное, рок/хип-хоп)
-  calm,        // Спокойное (чилл, релакс, акустика, lo-fi)
-  coldStart,   // Популярное (хиты и топ чарты)
+  favorites, // Любимое (золотая коллекция пользователя)
+  energy, // Драйв (бодрое, танцевальное, рок/хип-хоп)
+  calm, // Спокойное (чилл, релакс, акустика, lo-fi)
+  coldStart, // Популярное (хиты и топ чарты)
 }
 
 extension WaveModeX on WaveMode {
@@ -159,93 +159,504 @@ extension WaveModeX on WaveMode {
 class ArtistSimilarityGraph {
   static final Map<String, List<String>> _similarityMap = {
     // Russian Hip-Hop / Trap
-    'скриптонит': ['104', 'truwer', 'niman', 'saluki', 'масло черного тмина', 't fest', 'баста'],
-    'saluki': ['boulevard depo', 'сеня полоз', 'thomas mraz', 'og buda', '104', 'скриптонит'],
-    'pharaoh': ['лсп', 'boulevard depo', 'mnogoznaal', 'jeembo', 'tveth', 'saluki', 'dead dynasty'],
-    'oxxxymiron': ['markul', 'loqiemean', 'porchy', 'thomas mraz', 'horus', 'schokk', 'atl'],
-    'boulevard depo': ['saluki', 'pharaoh', 'jeembo', 'basic boy', 'glebasta spal', 'rocket'],
-    'big baby tape': ['kizaru', 'aarne', 'alblak 52', 'friendly thug 52 ngg', r'toxi$', 'og buda'],
-    'kizaru': ['big baby tape', 'alblak 52', 'friendly thug 52 ngg', 'obratno', 'hoodrich pablo juan'],
-    'friendly thug 52 ngg': ['alblak 52', 'glocki52', 'saintprince 52', 'big baby tape', 'kizaru'],
-    'alblak 52': ['friendly thug 52 ngg', 'glocki52', 'big baby tape', 'kizaru'],
+    'скриптонит': [
+      '104',
+      'truwer',
+      'niman',
+      'saluki',
+      'масло черного тмина',
+      't fest',
+      'баста'
+    ],
+    'saluki': [
+      'boulevard depo',
+      'сеня полоз',
+      'thomas mraz',
+      'og buda',
+      '104',
+      'скриптонит'
+    ],
+    'pharaoh': [
+      'лсп',
+      'boulevard depo',
+      'mnogoznaal',
+      'jeembo',
+      'tveth',
+      'saluki',
+      'dead dynasty'
+    ],
+    'oxxxymiron': [
+      'markul',
+      'loqiemean',
+      'porchy',
+      'thomas mraz',
+      'horus',
+      'schokk',
+      'atl'
+    ],
+    'boulevard depo': [
+      'saluki',
+      'pharaoh',
+      'jeembo',
+      'basic boy',
+      'glebasta spal',
+      'rocket'
+    ],
+    'big baby tape': [
+      'kizaru',
+      'aarne',
+      'alblak 52',
+      'friendly thug 52 ngg',
+      r'toxi$',
+      'og buda'
+    ],
+    'kizaru': [
+      'big baby tape',
+      'alblak 52',
+      'friendly thug 52 ngg',
+      'obratno',
+      'hoodrich pablo juan'
+    ],
+    'friendly thug 52 ngg': [
+      'alblak 52',
+      'glocki52',
+      'saintprince 52',
+      'big baby tape',
+      'kizaru'
+    ],
+    'alblak 52': [
+      'friendly thug 52 ngg',
+      'glocki52',
+      'big baby tape',
+      'kizaru'
+    ],
     'macan': ['navai', 'hammali navai', 'xcho', 'jakone', 'kiliana', 'ramil'],
-    'miyagi эндшпиль': ['andy panda', 'miyagi', 'tumaniyo', 'castle', 'mav d', 'krec', 'hloy'],
-    'miyagi': ['andy panda', 'miyagi эндшпиль', 'tumaniyo', 'castle', 'hloy', 'rem digga'],
+    'miyagi эндшпиль': [
+      'andy panda',
+      'miyagi',
+      'tumaniyo',
+      'castle',
+      'mav d',
+      'krec',
+      'hloy'
+    ],
+    'miyagi': [
+      'andy panda',
+      'miyagi эндшпиль',
+      'tumaniyo',
+      'castle',
+      'hloy',
+      'rem digga'
+    ],
     'andy panda': ['miyagi', 'miyagi эндшпиль', 'tumaniyo', 'castle', 'hloy'],
-    'atl': ['горизонт', 'loqiemean', 'егор натс', 'oxxxymiron', 'пика', 'зараза'],
+    'atl': [
+      'горизонт',
+      'loqiemean',
+      'егор натс',
+      'oxxxymiron',
+      'пика',
+      'зараза'
+    ],
     'markul': ['oxxxymiron', 'thomas mraz', 'obladaet', 'платина', 'feduk'],
-    'og buda': ['mayot', 'seventeen', r'toxi$', 'scally milano', '163onmyneck', 'saluki'],
+    'og buda': [
+      'mayot',
+      'seventeen',
+      r'toxi$',
+      'scally milano',
+      '163onmyneck',
+      'saluki'
+    ],
     'mayot': ['og buda', 'seventeen', 'scally milano', '163onmyneck', r'toxi$'],
     r'toxi$': ['og buda', 'mayot', 'big baby tape', 'aarne', 'heronwater'],
 
     // Russian Indie / Post-Punk / Alternative
-    'дайте танк': ['ssshhhiiittt', 'папин олимпос', 'перемотка', 'комсомольск', 'валентин стрыкало', 'петля пристрастия'],
-    'молчат дома': ['ploho', 'буерак', 'дурной вкус', 'chernikovskaya hata', 'электрофорез', 'союз'],
-    'буерак': ['молчат дома', 'ploho', 'дурной вкус', 'пасош', 'увула', 'электрофорез'],
-    'ssshhhiiittt': ['дайте танк', 'папин олимпос', 'перемотка', 'пасош', 'пошлая молли'],
-    'папин олимпос': ['дайте танк', 'ssshhhiiittt', 'три дня дождя', 'валентин стрыкало'],
-    'три дня дождя': ['zivert', 'папин олимпос', 'мукка', 'кис кис', 'тринадцать карат'],
-    'сироткин': ['polnalyubvi', 'мы', 'свидание', 'the retuses', 'обе две', 'тима ищет свет'],
-    'polnalyubvi': ['сироткин', 'мы', 'свидание', 'обе две', 'маяковский', 'алена швец'],
-    'перемотка': ['дайте танк', 'молчат дома', 'буерак', 'ssshhhiiittt', 'дурной вкус'],
+    'дайте танк': [
+      'ssshhhiiittt',
+      'папин олимпос',
+      'перемотка',
+      'комсомольск',
+      'валентин стрыкало',
+      'петля пристрастия'
+    ],
+    'молчат дома': [
+      'ploho',
+      'буерак',
+      'дурной вкус',
+      'chernikovskaya hata',
+      'электрофорез',
+      'союз'
+    ],
+    'буерак': [
+      'молчат дома',
+      'ploho',
+      'дурной вкус',
+      'пасош',
+      'увула',
+      'электрофорез'
+    ],
+    'ssshhhiiittt': [
+      'дайте танк',
+      'папин олимпос',
+      'перемотка',
+      'пасош',
+      'пошлая молли'
+    ],
+    'папин олимпос': [
+      'дайте танк',
+      'ssshhhiiittt',
+      'три дня дождя',
+      'валентин стрыкало'
+    ],
+    'три дня дождя': [
+      'zivert',
+      'папин олимпос',
+      'мукка',
+      'кис кис',
+      'тринадцать карат'
+    ],
+    'сироткин': [
+      'polnalyubvi',
+      'мы',
+      'свидание',
+      'the retuses',
+      'обе две',
+      'тима ищет свет'
+    ],
+    'polnalyubvi': [
+      'сироткин',
+      'мы',
+      'свидание',
+      'обе две',
+      'маяковский',
+      'алена швец'
+    ],
+    'перемотка': [
+      'дайте танк',
+      'молчат дома',
+      'буерак',
+      'ssshhhiiittt',
+      'дурной вкус'
+    ],
     'электрофорез': ['молчат дома', 'буерак', 'ploho', 'shortparis', 'ic3peak'],
-    'shortparis': ['электрофорез', 'ic3peak', 'аигел', 'хадн дадн', 'глупый белый'],
-    'валентин стрыкало': ['дайте танк', 'папин олимпос', 'ssshhhiiittt', 'пошлая молли', 'нервы'],
-    'нервы': ['валентин стрыкало', 'пошлая молли', 'три дня дождя', 'папин олимпос'],
+    'shortparis': [
+      'электрофорез',
+      'ic3peak',
+      'аигел',
+      'хадн дадн',
+      'глупый белый'
+    ],
+    'валентин стрыкало': [
+      'дайте танк',
+      'папин олимпос',
+      'ssshhhiiittt',
+      'пошлая молли',
+      'нервы'
+    ],
+    'нервы': [
+      'валентин стрыкало',
+      'пошлая молли',
+      'три дня дождя',
+      'папин олимпос'
+    ],
 
     // Russian Rock & Classic
-    'король и шут': ['княzz', 'сектор газа', 'порнофильмы', 'кукрыниксы', 'эпидемия', 'кипелов'],
+    'король и шут': [
+      'княzz',
+      'сектор газа',
+      'порнофильмы',
+      'кукрыниксы',
+      'эпидемия',
+      'кипелов'
+    ],
     'княzz': ['король и шут', 'сектор газа', 'кукрыниксы', 'ария'],
-    'сектор газа': ['король и шут', 'княzz', 'гражданская оборона', 'ленинград'],
-    'кино': ['наутилус помпилиус', 'аквариум', 'ддт', 'алиса', 'би 2', 'сплин', 'виктор цой'],
-    'наутилус помпилиус': ['кино', 'сплин', 'агата кристи', 'пикник', 'ддт', 'би 2'],
-    'би 2': ['сплин', 'земфира', 'мумий тролль', 'агата кристи', 'кино', 'ночные снайперы'],
-    'сплин': ['би 2', 'земфира', 'мумий тролль', 'кино', 'наутилус помпилиус', 'animal джаz'],
-    'земфира': ['мумий тролль', 'ночные снайперы', 'сплин', 'би 2', 'моя мишель'],
+    'сектор газа': [
+      'король и шут',
+      'княzz',
+      'гражданская оборона',
+      'ленинград'
+    ],
+    'кино': [
+      'наутилус помпилиус',
+      'аквариум',
+      'ддт',
+      'алиса',
+      'би 2',
+      'сплин',
+      'виктор цой'
+    ],
+    'наутилус помпилиус': [
+      'кино',
+      'сплин',
+      'агата кристи',
+      'пикник',
+      'ддт',
+      'би 2'
+    ],
+    'би 2': [
+      'сплин',
+      'земфира',
+      'мумий тролль',
+      'агата кристи',
+      'кино',
+      'ночные снайперы'
+    ],
+    'сплин': [
+      'би 2',
+      'земфира',
+      'мумий тролль',
+      'кино',
+      'наутилус помпилиус',
+      'animal джаz'
+    ],
+    'земфира': [
+      'мумий тролль',
+      'ночные снайперы',
+      'сплин',
+      'би 2',
+      'моя мишель'
+    ],
     'агата кристи': ['наутилус помпилиус', 'пикник', 'сплин', 'король и шут'],
-    'порнофильмы': ['король и шут', 'йорш', 'тараканы', 'люмен', 'lumen', 'план ломоносова'],
+    'порнофильмы': [
+      'король и шут',
+      'йорш',
+      'тараканы',
+      'люмен',
+      'lumen',
+      'план ломоносова'
+    ],
 
     // Russian Pop / Electronic
-    'anna asti': ['zivert', 'мари краймбрери', 'jony', 'seville', 'люся чеботина', 'artik asti'],
-    'zivert': ['anna asti', 'мари краймбрери', 'cream soda', 'jony', 'моя мишель'],
-    'cream soda': ['антоха мс', 'tesla boy', 'иван дорн', 'kedr livanskiy', 'лауд'],
-    'jony': ['hammali navai', 'navai', 'motto', 'andry', 'elmin', 'xcho', 'rauf faik'],
+    'anna asti': [
+      'zivert',
+      'мари краймбрери',
+      'jony',
+      'seville',
+      'люся чеботина',
+      'artik asti'
+    ],
+    'zivert': [
+      'anna asti',
+      'мари краймбрери',
+      'cream soda',
+      'jony',
+      'моя мишель'
+    ],
+    'cream soda': [
+      'антоха мс',
+      'tesla boy',
+      'иван дорн',
+      'kedr livanskiy',
+      'лауд'
+    ],
+    'jony': [
+      'hammali navai',
+      'navai',
+      'motto',
+      'andry',
+      'elmin',
+      'xcho',
+      'rauf faik'
+    ],
 
     // International Rock / Metal / Alternative
-    'linkin park': ['bring me the horizon', 'three days grace', 'evanescence', 'papa roach', 'breaking benjamin', 'skillet'],
-    'bring me the horizon': ['linkin park', 'bad omens', 'architects', 'falling in reverse', 'i prevail'],
-    'three days grace': ['linkin park', 'skillet', 'breaking benjamin', 'saint asonia', 'shinedown'],
-    'deftones': ['korn', 'slipknot', 'system of a down', 'alice in chains', 'tool', 'chevelle'],
-    'system of a down': ['deftones', 'korn', 'slipknot', 'rage against the machine', 'serj tankian'],
-    'radiohead': ['the smile', 'thom yorke', 'muse', 'coldplay', 'massive attack', 'portishead'],
-    'arctic monkeys': ['the neighbourhood', 'the strokes', 'gorillaz', 'franz ferdinand', 'foals'],
-    'the neighbourhood': ['arctic monkeys', 'chase atlantic', 'cigarettes after sex', 'lana del rey', 'joji'],
-    'cigarettes after sex': ['the neighbourhood', 'beach house', 'mazzy star', 'lana del rey'],
-    'nirvana': ['foo fighters', 'soundgarden', 'pearl jam', 'alice in chains', 'the smashing pumpkins'],
+    'linkin park': [
+      'bring me the horizon',
+      'three days grace',
+      'evanescence',
+      'papa roach',
+      'breaking benjamin',
+      'skillet'
+    ],
+    'bring me the horizon': [
+      'linkin park',
+      'bad omens',
+      'architects',
+      'falling in reverse',
+      'i prevail'
+    ],
+    'three days grace': [
+      'linkin park',
+      'skillet',
+      'breaking benjamin',
+      'saint asonia',
+      'shinedown'
+    ],
+    'deftones': [
+      'korn',
+      'slipknot',
+      'system of a down',
+      'alice in chains',
+      'tool',
+      'chevelle'
+    ],
+    'system of a down': [
+      'deftones',
+      'korn',
+      'slipknot',
+      'rage against the machine',
+      'serj tankian'
+    ],
+    'radiohead': [
+      'the smile',
+      'thom yorke',
+      'muse',
+      'coldplay',
+      'massive attack',
+      'portishead'
+    ],
+    'arctic monkeys': [
+      'the neighbourhood',
+      'the strokes',
+      'gorillaz',
+      'franz ferdinand',
+      'foals'
+    ],
+    'the neighbourhood': [
+      'arctic monkeys',
+      'chase atlantic',
+      'cigarettes after sex',
+      'lana del rey',
+      'joji'
+    ],
+    'cigarettes after sex': [
+      'the neighbourhood',
+      'beach house',
+      'mazzy star',
+      'lana del rey'
+    ],
+    'nirvana': [
+      'foo fighters',
+      'soundgarden',
+      'pearl jam',
+      'alice in chains',
+      'the smashing pumpkins'
+    ],
     'rammstein': ['lindemann', 'oomph', 'eisbrecher', 'megaherz', 'pain'],
 
     // International Hip-Hop & R&B
-    'the weeknd': ['travis scott', 'drake', 'post malone', 'frank ocean', 'joji', 'kendrick lamar'],
-    'travis scott': ['metro boomin', 'playboi carti', '21 savage', 'don toliver', 'asap rocky'],
-    'kanye west': ['kid cudi', 'asap rocky', 'tyler the creator', 'pusha t', 'kendrick lamar', 'jay z'],
-    'drake': ['the weeknd', 'travis scott', 'future', '21 savage', 'partynextdoor'],
-    'kendrick lamar': ['j cole', 'kanye west', 'baby keem', 'asap rocky', 'schoolboy q'],
-    'joji': ['the neighbourhood', 'chase atlantic', 'the weeknd', 'frank ocean', 'keshi'],
-    'post malone': ['the weeknd', 'juice wrld', 'xxxtentacion', 'lil peep', 'iann dior'],
+    'the weeknd': [
+      'travis scott',
+      'drake',
+      'post malone',
+      'frank ocean',
+      'joji',
+      'kendrick lamar'
+    ],
+    'travis scott': [
+      'metro boomin',
+      'playboi carti',
+      '21 savage',
+      'don toliver',
+      'asap rocky'
+    ],
+    'kanye west': [
+      'kid cudi',
+      'asap rocky',
+      'tyler the creator',
+      'pusha t',
+      'kendrick lamar',
+      'jay z'
+    ],
+    'drake': [
+      'the weeknd',
+      'travis scott',
+      'future',
+      '21 savage',
+      'partynextdoor'
+    ],
+    'kendrick lamar': [
+      'j cole',
+      'kanye west',
+      'baby keem',
+      'asap rocky',
+      'schoolboy q'
+    ],
+    'joji': [
+      'the neighbourhood',
+      'chase atlantic',
+      'the weeknd',
+      'frank ocean',
+      'keshi'
+    ],
+    'post malone': [
+      'the weeknd',
+      'juice wrld',
+      'xxxtentacion',
+      'lil peep',
+      'iann dior'
+    ],
     'eminem': ['50 cent', 'dr dre', '2pac', 'snoop dogg', 'royce da 5 9'],
 
     // International Electronic & Synthwave
-    'daft punk': ['justice', 'kavinsky', 'the chemical brothers', 'gesaffelstein', 'carpenter brut', 'moderat'],
-    'gesaffelstein': ['daft punk', 'kavinsky', 'boyz noize', 'carpenter brut', 'perturbator'],
-    'kavinsky': ['daft punk', 'gesaffelstein', 'carpenter brut', 'perturbator', 'lorn'],
-    'burial': ['four tet', 'bonobo', 'tycho', 'boards of canada', 'aphex twin', 'jon hopkins'],
-    'bonobo': ['tycho', 'four tet', 'maribou state', 'burial', 'emancipator', 'olafor arnalds'],
-    'massive attack': ['portishead', 'tricky', 'morcheeba', 'radiohead', 'sneaker pimps'],
+    'daft punk': [
+      'justice',
+      'kavinsky',
+      'the chemical brothers',
+      'gesaffelstein',
+      'carpenter brut',
+      'moderat'
+    ],
+    'gesaffelstein': [
+      'daft punk',
+      'kavinsky',
+      'boyz noize',
+      'carpenter brut',
+      'perturbator'
+    ],
+    'kavinsky': [
+      'daft punk',
+      'gesaffelstein',
+      'carpenter brut',
+      'perturbator',
+      'lorn'
+    ],
+    'burial': [
+      'four tet',
+      'bonobo',
+      'tycho',
+      'boards of canada',
+      'aphex twin',
+      'jon hopkins'
+    ],
+    'bonobo': [
+      'tycho',
+      'four tet',
+      'maribou state',
+      'burial',
+      'emancipator',
+      'olafor arnalds'
+    ],
+    'massive attack': [
+      'portishead',
+      'tricky',
+      'morcheeba',
+      'radiohead',
+      'sneaker pimps'
+    ],
 
     // International Pop & Indie
-    'billie eilish': ['lana del rey', 'lorde', 'finneas', 'olivia rodrigo', 'girl in red', 'clairo'],
-    'lana del rey': ['billie eilish', 'the neighbourhood', 'marina', 'arctic monkeys', 'florence the machine'],
-    'dua lipa': ['the weeknd', 'miley cyrus', 'doja cat', 'charli xcx', 'ava max'],
+    'billie eilish': [
+      'lana del rey',
+      'lorde',
+      'finneas',
+      'olivia rodrigo',
+      'girl in red',
+      'clairo'
+    ],
+    'lana del rey': [
+      'billie eilish',
+      'the neighbourhood',
+      'marina',
+      'arctic monkeys',
+      'florence the machine'
+    ],
+    'dua lipa': [
+      'the weeknd',
+      'miley cyrus',
+      'doja cat',
+      'charli xcx',
+      'ava max'
+    ],
   };
 
   /// Returns known similar artists for [rawArtist].
@@ -274,6 +685,30 @@ class ArtistSimilarityGraph {
 // ══════════════════════════════════════════════════════════════
 
 class WaveProfileStore {
+  Future<List<String>> favoriteArtists() async {
+    final prefs = await SharedPreferences.getInstance();
+    final token = await AuthService().getSavedToken();
+    String account = 'guest';
+    try {
+      final payload = jsonDecode(utf8
+          .decode(base64Url.decode(base64Url.normalize(token!.split('.')[1]))));
+      account = payload['nickname'] as String;
+    } catch (_) {}
+    return prefs.getStringList('favorite_artists_$account') ?? [];
+  }
+
+  Future<void> saveFavoriteArtists(List<String> artists) async {
+    final prefs = await SharedPreferences.getInstance();
+    final token = await AuthService().getSavedToken();
+    String account = 'guest';
+    try {
+      final payload = jsonDecode(utf8
+          .decode(base64Url.decode(base64Url.normalize(token!.split('.')[1]))));
+      account = payload['nickname'] as String;
+    } catch (_) {}
+    await prefs.setStringList('favorite_artists_$account', artists);
+  }
+
   static const _keyArtists = 'wave_profile_artists_v2';
   static const _keyHistory = 'wave_profile_history_v2';
   static const _keyDislikes = 'wave_profile_dislikes_v2';
@@ -487,11 +922,13 @@ class WaveGenerator {
     required this.musicService,
     required this.store,
     this.authService,
+    this.favoritesProvider,
   });
 
   final MusicService musicService;
   final WaveProfileStore store;
   final AuthService? authService;
+  final List<Track> Function()? favoritesProvider;
   final Random _random = Random();
 
   final Set<String> _sessionPlayedKeys = {};
@@ -506,7 +943,8 @@ class WaveGenerator {
     WaveMode mode = WaveMode.flow,
   }) async {
     if (_sessionPlayedKeys.length > 60) {
-      final keep = _sessionPlayedKeys.skip(_sessionPlayedKeys.length - 20).toList();
+      final keep =
+          _sessionPlayedKeys.skip(_sessionPlayedKeys.length - 20).toList();
       _sessionPlayedKeys
         ..clear()
         ..addAll(keep);
@@ -516,13 +954,15 @@ class WaveGenerator {
     final historySet = await store.historyKeysLast(150);
 
     // 1. Fetch user's saved favorites
-    List<Track> userFavorites = const [];
+    List<Track> userFavorites = favoritesProvider?.call() ?? const [];
     String? token;
     if (authService != null) {
       try {
         token = await authService!.getSavedToken();
-        if (token != null && token.isNotEmpty) {
-          userFavorites = await authService!.listFavorites(token);
+        if (token != null && token.isNotEmpty && favoritesProvider == null) {
+          userFavorites = await authService!
+              .listFavorites(token)
+              .timeout(const Duration(seconds: 3), onTimeout: () => <Track>[]);
         }
       } catch (_) {}
     }
@@ -549,6 +989,9 @@ class WaveGenerator {
 
     // 3. Extract user's core taste artists (combining favorites + history)
     final artistFrequency = <String, double>{};
+    for (final artist in await store.favoriteArtists()) {
+      artistFrequency[canonicalArtist(artist)] = 24;
+    }
     for (final t in userFavorites) {
       final a = canonicalArtist(t.artist);
       if (a.isNotEmpty) {
@@ -564,7 +1007,8 @@ class WaveGenerator {
     }
 
     final rankedArtists = artistFrequency.keys.toList()
-      ..sort((a, b) => (artistFrequency[b] ?? 0.0).compareTo(artistFrequency[a] ?? 0.0));
+      ..sort((a, b) =>
+          (artistFrequency[b] ?? 0.0).compareTo(artistFrequency[a] ?? 0.0));
 
     // Fallback if brand new user without any history or likes
     if (rankedArtists.isEmpty) {
@@ -585,7 +1029,7 @@ class WaveGenerator {
     }
 
     // 5. Build dynamic search queries based on mode & taste
-    final searchQueries = <String>[];
+    final searchQueries = <String>[...coreArtists.take(2)];
 
     // Mode-specific query synthesis
     switch (mode) {
@@ -609,7 +1053,8 @@ class WaveGenerator {
           'свежий хип хоп новинки',
           'открытия музыка',
         ];
-        searchQueries.add(discoveryQueries[_random.nextInt(discoveryQueries.length)]);
+        searchQueries
+            .add(discoveryQueries[_random.nextInt(discoveryQueries.length)]);
         break;
 
       case WaveMode.energy:
@@ -672,7 +1117,8 @@ class WaveGenerator {
 
     // C) Yandex Music native collaborative filtering: fetch similar tracks using favorite seeds
     final similarFutures = <Future<List<Track>>>[];
-    final sampledSeeds = (List<Track>.from(userFavorites)..shuffle(_random)).take(4);
+    final sampledSeeds =
+        (List<Track>.from(userFavorites)..shuffle(_random)).take(4);
     for (final seedTrack in sampledSeeds) {
       final cleanId = (seedTrack.externalId ?? seedTrack.id)
           .replaceAll(RegExp(r'^[a-zA-Z]+:'), '')
@@ -686,39 +1132,29 @@ class WaveGenerator {
       }
     }
 
-    final searchResults = await Future.wait(
-      searchFutures.map(
-        (f) => f.timeout(
-          const Duration(seconds: 8),
-          onTimeout: () => <Track>[],
-        ),
-      ),
-    );
-    for (final list in searchResults) {
-      rawCandidates.addAll(list);
-    }
-
-    final similarResults = await Future.wait(
-      similarFutures.map(
-        (f) => f.timeout(
-          const Duration(seconds: 8),
-          onTimeout: () => <Track>[],
-        ),
-      ),
-    );
-    for (final list in similarResults) {
-      rawCandidates.addAll(list);
-    }
-
-    if (serverWaveFuture != null) {
-      try {
-        final serverTracks = await serverWaveFuture.timeout(
-          const Duration(seconds: 6),
-          onTimeout: () => <Track>[],
-        );
-        rawCandidates.addAll(serverTracks);
-      } catch (_) {}
-    }
+    // All sources share one deadline; a slow endpoint cannot add another wait.
+    final requests = <Future<List<Track>>>[
+      ...searchFutures,
+      ...similarFutures,
+      if (serverWaveFuture != null) serverWaveFuture,
+    ];
+    final collected = <Track>[];
+    final ready = Completer<void>();
+    final all = Future.wait(requests.map((request) async {
+      final tracks = await request
+          .timeout(
+            const Duration(seconds: 5),
+            onTimeout: () => <Track>[],
+          )
+          .catchError((_) => <Track>[]);
+      collected.addAll(tracks);
+      if (!ready.isCompleted &&
+          collected.where((t) => t.hasPlayableUrl).length >= 8) {
+        ready.complete();
+      }
+    }));
+    await Future.any([all, ready.future]);
+    rawCandidates.addAll(List<Track>.of(collected));
 
     // 7. Filter candidate tracks
     final candidateSet = <Track>[];
@@ -765,6 +1201,9 @@ class WaveGenerator {
         if (!tr.hasPlayableUrl) continue;
         final k = store.makeTrackKey(tr.artist, tr.title);
         if (k.isEmpty || seenKeys.contains(k)) continue;
+        if (await store.isDisliked(k) || await store.skipCount(k) >= 3) {
+          continue;
+        }
         seenKeys.add(k);
         candidateSet.add(tr);
       }
@@ -1031,7 +1470,9 @@ class WaveController extends ChangeNotifier {
         mode: mode,
       );
 
-      if (moreTracks.isNotEmpty && isRunning && playerController.isWavePlayback) {
+      if (moreTracks.isNotEmpty &&
+          isRunning &&
+          playerController.isWavePlayback) {
         playerController.appendTracks(moreTracks);
       }
     } catch (_) {}
@@ -1103,12 +1544,15 @@ class WaveController extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> setMode(WaveMode newMode, {PlayerController? playerController}) async {
+  Future<void> setMode(WaveMode newMode,
+      {PlayerController? playerController}) async {
     if (mode == newMode && isRunning) return;
     mode = newMode;
     notifyListeners();
 
-    if (isRunning && playerController != null && playerController.isWavePlayback) {
+    if (isRunning &&
+        playerController != null &&
+        playerController.isWavePlayback) {
       isLoading = true;
       statusMessage = 'Переключаем волну...';
       notifyListeners();
@@ -1120,7 +1564,8 @@ class WaveController extends ChangeNotifier {
         );
 
         if (tracks.isNotEmpty) {
-          await playerController.playTracks(tracks, startIndex: 0, isWave: true);
+          await playerController.playTracks(tracks,
+              startIndex: 0, isWave: true);
           _onTrackStarted(playerController.currentTrack);
           statusMessage = 'Волна в эфире';
         }

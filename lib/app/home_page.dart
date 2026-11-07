@@ -143,7 +143,8 @@ class _HomePageState extends State<HomePage> {
                 waveRunning: widget.waveController.isRunning,
                 onOpenFavorites: widget.onOpenFavorites,
                 onOpenWave: widget.onOpenWave,
-                onPlayTrack: (track) => widget.playerController.playTrack(track),
+                onPlayTrack: (track) =>
+                    widget.playerController.playTrack(track),
               ),
 
               const SizedBox(height: 18),
@@ -163,9 +164,8 @@ class _HomePageState extends State<HomePage> {
               _TrackRail(
                 title: 'Для тебя',
                 subtitle: 'Быстрый доступ к тому, что уже собрано в UNMUTE.',
-                tracks: favoriteTracks.isNotEmpty
-                    ? favoriteTracks
-                    : recentTracks,
+                tracks:
+                    favoriteTracks.isNotEmpty ? favoriteTracks : recentTracks,
                 loading: _loading && favoriteTracks.isEmpty,
                 emptyTitle: 'Пока нечего рекомендовать',
                 emptySubtitle:
@@ -231,8 +231,8 @@ class _HomePageState extends State<HomePage> {
               emptyTitle: 'Пока нечего рекомендовать',
               emptySubtitle:
                   'Запусти поиск или добавь треки в избранное, и эта зона оживёт.',
-              onPlay: (index, tracks) => widget.playerController
-                  .playTracks(tracks, startIndex: index),
+              onPlay: (index, tracks) =>
+                  widget.playerController.playTracks(tracks, startIndex: index),
             ),
             const SizedBox(height: 24),
             const _MoodRail(),
@@ -245,8 +245,8 @@ class _HomePageState extends State<HomePage> {
               emptyTitle: 'Очередь пока пустая',
               emptySubtitle:
                   'Когда включите музыку, последние треки появятся здесь.',
-              onPlay: (index, tracks) => widget.playerController
-                  .playTracks(tracks, startIndex: index),
+              onPlay: (index, tracks) =>
+                  widget.playerController.playTracks(tracks, startIndex: index),
             ),
             const SizedBox(height: 24),
             _PlaylistSection(playlists: _playlists, loading: _loading),
@@ -281,7 +281,7 @@ class _SpotifyMobileQuickGrid extends StatelessWidget {
           width: 52,
           height: 52,
           decoration: const BoxDecoration(
-            borderRadius: BorderRadius.horizontal(left: Radius.circular(6)),
+            borderRadius: BorderRadius.horizontal(left: Radius.circular(16)),
             gradient: LinearGradient(
               colors: [AppTheme.accent, AppTheme.accentWarm],
             ),
@@ -298,7 +298,7 @@ class _SpotifyMobileQuickGrid extends StatelessWidget {
           height: 52,
           decoration: BoxDecoration(
             borderRadius:
-                const BorderRadius.horizontal(left: Radius.circular(6)),
+                const BorderRadius.horizontal(left: Radius.circular(16)),
             gradient: LinearGradient(
               colors: [
                 waveRunning ? AppTheme.accent2 : AppTheme.accent,
@@ -323,7 +323,7 @@ class _SpotifyMobileQuickGrid extends StatelessWidget {
           title: track.title,
           leading: ClipRRect(
             borderRadius:
-                const BorderRadius.horizontal(left: Radius.circular(6)),
+                const BorderRadius.horizontal(left: Radius.circular(16)),
             child: UnmuteArtwork(
               imageUrl: track.image,
               size: 52,
@@ -343,7 +343,7 @@ class _SpotifyMobileQuickGrid extends StatelessWidget {
         crossAxisCount: 2,
         mainAxisSpacing: 8,
         crossAxisSpacing: 8,
-        childAspectRatio: 3.1,
+        childAspectRatio: 2.8,
         children: quickItems,
       ),
     );
@@ -366,7 +366,7 @@ class _QuickGridCard extends StatelessWidget {
     return Container(
       decoration: BoxDecoration(
         color: AppTheme.surfaceRaised.withValues(alpha: 0.85),
-        borderRadius: BorderRadius.circular(6),
+        borderRadius: BorderRadius.circular(16),
         border: Border.all(
           color: Colors.white.withValues(alpha: 0.06),
           width: 0.6,
@@ -423,15 +423,15 @@ class _SpotifyMobileWaveBanner extends StatelessWidget {
 
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16),
-      padding: const EdgeInsets.all(14),
+      padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(28),
         gradient: LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
           colors: [
             AppTheme.accent.withValues(alpha: 0.42),
-            const Color(0xFF1E1016),
+            const Color(0xFF20233B),
             AppTheme.surfaceRaised,
           ],
         ),
@@ -473,7 +473,11 @@ class _SpotifyMobileWaveBanner extends StatelessWidget {
                 Row(
                   children: [
                     Text(
-                      isRunning ? 'МОЯ ВОЛНА В ЭФИРЕ' : 'МОЯ ВОЛНА',
+                      waveController.isLoading
+                          ? 'НАСТРАИВАЕМ ВОЛНУ'
+                          : isRunning
+                              ? 'В ЭФИРЕ'
+                              : 'ДЛЯ ТЕБЯ',
                       style: const TextStyle(
                         fontSize: 10.5,
                         fontWeight: FontWeight.w800,
@@ -492,7 +496,7 @@ class _SpotifyMobileWaveBanner extends StatelessWidget {
                 Text(
                   isRunning && currentTrack != null
                       ? currentTrack!.title
-                      : 'Бесконечный поток под твой вкус',
+                      : 'Музыка на твоей частоте',
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: const TextStyle(
@@ -505,7 +509,7 @@ class _SpotifyMobileWaveBanner extends StatelessWidget {
                 Text(
                   isRunning && currentTrack != null
                       ? currentTrack!.artist
-                      : 'Нажми диск или открой плеер',
+                      : 'Любимые артисты. Новые открытия.',
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: const TextStyle(
@@ -519,7 +523,7 @@ class _SpotifyMobileWaveBanner extends StatelessWidget {
           IconButton.filled(
             style: IconButton.styleFrom(
               backgroundColor: AppTheme.accent,
-              foregroundColor: Colors.white,
+              foregroundColor: AppTheme.background,
             ),
             icon: Icon(
               isRunning && isPlaying
@@ -622,7 +626,9 @@ class _HomeHero extends StatelessWidget {
               Expanded(
                 flex: compact ? 0 : 5,
                 child: Column(
-                  crossAxisAlignment: compact ? CrossAxisAlignment.center : CrossAxisAlignment.start,
+                  crossAxisAlignment: compact
+                      ? CrossAxisAlignment.center
+                      : CrossAxisAlignment.start,
                   mainAxisSize: compact ? MainAxisSize.min : MainAxisSize.max,
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
@@ -633,10 +639,11 @@ class _HomeHero extends StatelessWidget {
                         const SizedBox(width: 10),
                         Text(
                           isWaveRunning ? 'Моя Волна в эфире' : 'UNMUTE Music',
-                          style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                                color: AppTheme.accent2,
-                                fontWeight: FontWeight.bold,
-                              ),
+                          style:
+                              Theme.of(context).textTheme.labelLarge?.copyWith(
+                                    color: AppTheme.accent2,
+                                    fontWeight: FontWeight.bold,
+                                  ),
                         ),
                       ],
                     ),
@@ -667,7 +674,8 @@ class _HomeHero extends StatelessWidget {
                     Wrap(
                       spacing: 12,
                       runSpacing: 12,
-                      alignment: compact ? WrapAlignment.center : WrapAlignment.start,
+                      alignment:
+                          compact ? WrapAlignment.center : WrapAlignment.start,
                       children: [
                         ElevatedButton.icon(
                           onPressed: () {
@@ -680,8 +688,9 @@ class _HomeHero extends StatelessWidget {
                           },
                           style: ElevatedButton.styleFrom(
                             backgroundColor: AppTheme.accent,
-                            foregroundColor: Colors.white,
-                            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+                            foregroundColor: AppTheme.background,
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 20, vertical: 14),
                           ),
                           icon: Icon(
                             isWaveRunning
@@ -690,7 +699,9 @@ class _HomeHero extends StatelessWidget {
                             size: 20,
                           ),
                           label: Text(
-                            isWaveRunning ? 'Открыть Волну' : 'Запустить Мою Волну',
+                            isWaveRunning
+                                ? 'Открыть Волну'
+                                : 'Запустить Мою Волну',
                             style: const TextStyle(fontWeight: FontWeight.bold),
                           ),
                         ),
@@ -699,8 +710,10 @@ class _HomeHero extends StatelessWidget {
                           icon: const Icon(Icons.search_rounded, size: 20),
                           label: const Text('Поиск'),
                         ),
-                        _MetricBadge(label: 'Избранное', value: '$favoriteCount'),
-                        _MetricBadge(label: 'Плейлисты', value: '$playlistCount'),
+                        _MetricBadge(
+                            label: 'Избранное', value: '$favoriteCount'),
+                        _MetricBadge(
+                            label: 'Плейлисты', value: '$playlistCount'),
                       ],
                     ),
                   ],
@@ -760,9 +773,24 @@ class _QuickActions extends StatelessWidget {
   Widget build(BuildContext context) {
     final actions = [
       ('Моя Волна', 'Умный бесконечный поток', Icons.waves_rounded, onOpenWave),
-      ('Поиск', 'Треки, артисты, альбомы', Icons.manage_search_rounded, onOpenSearch),
-      ('Избранное', 'Сохранённые треки', Icons.favorite_rounded, onOpenFavorites),
-      ('Плейлисты', 'Коллекции и импорт', Icons.queue_music_rounded, onOpenPlaylists),
+      (
+        'Поиск',
+        'Треки, артисты, альбомы',
+        Icons.manage_search_rounded,
+        onOpenSearch
+      ),
+      (
+        'Избранное',
+        'Сохранённые треки',
+        Icons.favorite_rounded,
+        onOpenFavorites
+      ),
+      (
+        'Плейлисты',
+        'Коллекции и импорт',
+        Icons.queue_music_rounded,
+        onOpenPlaylists
+      ),
     ];
 
     return LayoutBuilder(
@@ -810,7 +838,9 @@ class _QuickActions extends StatelessWidget {
                       ),
                       child: Icon(
                         action.$3,
-                        color: isWave ? AppTheme.accent2 : AppTheme.accent2.withValues(alpha: 0.85),
+                        color: isWave
+                            ? AppTheme.accent2
+                            : AppTheme.accent2.withValues(alpha: 0.85),
                         size: 24,
                       ),
                     ),
@@ -820,13 +850,21 @@ class _QuickActions extends StatelessWidget {
                         mainAxisAlignment: MainAxisAlignment.center,
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(action.$1, style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold)),
+                          Text(action.$1,
+                              style: Theme.of(context)
+                                  .textTheme
+                                  .titleSmall
+                                  ?.copyWith(fontWeight: FontWeight.bold)),
                           const SizedBox(height: 3),
-                          Text(action.$2, maxLines: 1, overflow: TextOverflow.ellipsis, style: Theme.of(context).textTheme.bodySmall),
+                          Text(action.$2,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: Theme.of(context).textTheme.bodySmall),
                         ],
                       ),
                     ),
-                    const Icon(Icons.arrow_forward_rounded, size: 16, color: AppTheme.textMuted),
+                    const Icon(Icons.arrow_forward_rounded,
+                        size: 16, color: AppTheme.textMuted),
                   ],
                 ),
               ),

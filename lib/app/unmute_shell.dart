@@ -110,6 +110,7 @@ class _UnmuteShellState extends State<UnmuteShell> {
       musicService: _musicService,
       store: _waveStore,
       authService: _authService,
+      favoritesProvider: () => _favorites,
     );
     _waveController = WaveController(
       generator: _waveGenerator,
@@ -607,14 +608,17 @@ class _MobileBottomNavBar extends StatelessWidget {
                 onChanged(item.$1);
               },
               child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     Icon(
                       item.$3,
                       size: 24,
-                      color: active ? AppTheme.accent2 : Colors.white.withValues(alpha: 0.45),
+                      color: active
+                          ? AppTheme.accent2
+                          : Colors.white.withValues(alpha: 0.45),
                     ),
                     const SizedBox(height: 3),
                     Text(
@@ -622,7 +626,9 @@ class _MobileBottomNavBar extends StatelessWidget {
                       style: TextStyle(
                         fontSize: 10.5,
                         fontWeight: active ? FontWeight.w700 : FontWeight.w500,
-                        color: active ? Colors.white : Colors.white.withValues(alpha: 0.45),
+                        color: active
+                            ? Colors.white
+                            : Colors.white.withValues(alpha: 0.45),
                       ),
                     ),
                   ],
@@ -703,11 +709,13 @@ class _CollectionPage extends StatelessWidget {
       final artistName = track.artist.trim();
       if (artistName.isNotEmpty) {
         final key = '${track.source}:$artistName';
-        artists.putIfAbsent(key, () => ArtistSummary(
-          artistName: artistName,
-          source: track.source,
-          artistId: track.artistId,
-        ));
+        artists.putIfAbsent(
+            key,
+            () => ArtistSummary(
+                  artistName: artistName,
+                  source: track.source,
+                  artistId: track.artistId,
+                ));
       }
       final albumId = (track.albumId ?? '').trim();
       if (albumId.isNotEmpty) {
@@ -716,20 +724,29 @@ class _CollectionPage extends StatelessWidget {
     }
 
     final entries = onOpenArtist != null
-        ? artists.values.map((artist) => _CollectionEntry(
-              title: artist.artistName,
-              subtitle: 'Исполнитель · ${artist.source}',
-              image: favorites.firstWhere((track) => track.artist == artist.artistName).image,
-              icon: Icons.person_rounded,
-              onTap: () => onOpenArtist!(artist),
-            )).toList()
-        : albums.values.map((track) => _CollectionEntry(
-              title: track.albumTitle?.trim().isNotEmpty == true ? track.albumTitle! : 'Альбом',
-              subtitle: '${track.artist} · ${track.albumYear ?? track.source}',
-              image: track.image,
-              icon: Icons.album_rounded,
-              onTap: () => onOpenAlbum!(track),
-            )).toList();
+        ? artists.values
+            .map((artist) => _CollectionEntry(
+                  title: artist.artistName,
+                  subtitle: 'Исполнитель · ${artist.source}',
+                  image: favorites
+                      .firstWhere((track) => track.artist == artist.artistName)
+                      .image,
+                  icon: Icons.person_rounded,
+                  onTap: () => onOpenArtist!(artist),
+                ))
+            .toList()
+        : albums.values
+            .map((track) => _CollectionEntry(
+                  title: track.albumTitle?.trim().isNotEmpty == true
+                      ? track.albumTitle!
+                      : 'Альбом',
+                  subtitle:
+                      '${track.artist} · ${track.albumYear ?? track.source}',
+                  image: track.image,
+                  icon: Icons.album_rounded,
+                  onTap: () => onOpenAlbum!(track),
+                ))
+            .toList();
 
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
       Padding(
@@ -744,7 +761,8 @@ class _CollectionPage extends StatelessWidget {
         child: entries.isEmpty
             ? EmptyStateWidget(
                 title: 'Здесь пока пусто',
-                subtitle: 'Ищи музыку и добавляй треки в избранное, чтобы собрать свою коллекцию.',
+                subtitle:
+                    'Ищи музыку и добавляй треки в избранное, чтобы собрать свою коллекцию.',
                 icon: icon,
                 action: ElevatedButton.icon(
                   onPressed: onSearch,
@@ -764,7 +782,12 @@ class _CollectionPage extends StatelessWidget {
 }
 
 class _CollectionEntry extends StatelessWidget {
-  const _CollectionEntry({required this.title, required this.subtitle, required this.image, required this.icon, required this.onTap});
+  const _CollectionEntry(
+      {required this.title,
+      required this.subtitle,
+      required this.image,
+      required this.icon,
+      required this.onTap});
   final String title;
   final String subtitle;
   final String? image;
@@ -774,8 +797,12 @@ class _CollectionEntry extends StatelessWidget {
   @override
   Widget build(BuildContext context) => ListTile(
         onTap: onTap,
-        leading: UnmuteArtwork(imageUrl: image, size: 54, radius: AppTheme.radiusSm),
-        title: Text(title, maxLines: 1, overflow: TextOverflow.ellipsis, style: Theme.of(context).textTheme.titleMedium),
+        leading:
+            UnmuteArtwork(imageUrl: image, size: 54, radius: AppTheme.radiusSm),
+        title: Text(title,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: Theme.of(context).textTheme.titleMedium),
         subtitle: Text(subtitle, maxLines: 1, overflow: TextOverflow.ellipsis),
         trailing: Icon(icon, size: 20, color: AppTheme.textMuted),
       );
