@@ -37,7 +37,8 @@ class _DynamicGradientBackgroundState extends State<DynamicGradientBackground> {
   @override
   void didUpdateWidget(covariant DynamicGradientBackground oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.artwork != widget.artwork || oldWidget.accent != widget.accent) {
+    if (oldWidget.artwork != widget.artwork ||
+        oldWidget.accent != widget.accent) {
       _accentFuture = _loadAccent();
     }
   }
@@ -57,7 +58,7 @@ class _DynamicGradientBackgroundState extends State<DynamicGradientBackground> {
       builder: (context, snapshot) {
         final accentColor = snapshot.data ?? widget.accent;
         return DecoratedBox(
-        decoration: BoxDecoration(color: AppTheme.background),
+          decoration: BoxDecoration(color: AppTheme.background),
           child: Stack(
             children: [
               if ((widget.artwork ?? '').trim().isNotEmpty)
@@ -661,18 +662,6 @@ class _PremiumTrackRowState extends State<PremiumTrackRow> {
             ),
             child: Row(
               children: [
-                SizedBox(
-                  width: 34,
-                  child: widget.isCurrent
-                      ? const Icon(Icons.graphic_eq_rounded,
-                          color: AppTheme.accent2, size: 18)
-                      : Text(
-                          widget.index == null ? '' : '${widget.index! + 1}',
-                          textAlign: TextAlign.center,
-                          style: Theme.of(context).textTheme.bodySmall,
-                        ),
-                ),
-                const SizedBox(width: 8),
                 UnmuteArtwork(
                     imageUrl: widget.track.image, size: 46, radius: 12),
                 const SizedBox(width: 12),
@@ -696,116 +685,38 @@ class _PremiumTrackRowState extends State<PremiumTrackRow> {
                     ],
                   ),
                 ),
-                Expanded(
-                  flex: 3,
-                  child: _TrackAlbum(
-                    title: widget.track.albumTitle,
-                    onTap: widget.onAlbum,
-                  ),
-                ),
-                /*
-                  child: Text(
-                    (widget.track.albumTitle ?? '').trim().isEmpty
-                        ? 'Альбом не указан'
-                        : widget.track.albumTitle!,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: Theme.of(context).textTheme.bodySmall,
-                  ),
-                ),
-                */
-                const SizedBox(width: 8),
-                AnimatedOpacity(
-                  opacity: _hovered || widget.isCurrent ? 1 : 0.68,
-                  duration: const Duration(milliseconds: 140),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      if (widget.onFavorite != null)
-                        PremiumIconButton(
-                          icon: widget.isFavorite
-                              ? Icons.favorite_rounded
-                              : Icons.favorite_border_rounded,
-                          selected: widget.isFavorite,
-                          tooltip: 'Favorite',
-                          size: 34,
-                          onTap: widget.onFavorite,
-                        ),
-                      if (widget.onArtist != null)
-                        PremiumIconButton(
-                          icon: Icons.person_outline_rounded,
-                          tooltip: 'Artist',
-                          size: 34,
-                          onTap: () => _openArtist(widget.track.artist.trim()),
-                        ),
-                      if (widget.onAlbum != null)
-                        PremiumIconButton(
-                          icon: Icons.album_outlined,
-                          tooltip: 'Album',
-                          size: 34,
-                          onTap: widget.onAlbum,
-                        ),
-                      if (widget.onPlaylist != null)
-                        PremiumIconButton(
-                          icon: Icons.playlist_add_rounded,
-                          tooltip: 'Add to playlist',
-                          size: 34,
-                          onTap: widget.onPlaylist,
-                        ),
-                      if (widget.onRemove != null)
-                        PremiumIconButton(
-                          icon: Icons.delete_outline_rounded,
-                          tooltip: 'Remove',
-                          size: 34,
-                          onTap: widget.onRemove,
-                        ),
-                      if (widget.onPlay != null) ...[
-                        const SizedBox(width: 6),
-                        PlayButton(onTap: widget.onPlay, size: 38),
-                      ],
-                    ],
-                  ),
+                PopupMenuButton<VoidCallback>(
+                  tooltip: 'Действия с треком',
+                  icon: const Icon(Icons.more_horiz_rounded),
+                  onSelected: (action) => action(),
+                  itemBuilder: (_) => [
+                    if (widget.onFavorite != null)
+                      PopupMenuItem(
+                          value: widget.onFavorite,
+                          child: Text(widget.isFavorite
+                              ? 'Убрать из избранного'
+                              : 'В избранное')),
+                    if (widget.onArtist != null)
+                      PopupMenuItem<VoidCallback>(
+                          value: () => _openArtist(widget.track.artist.trim()),
+                          child: const Text('Исполнитель')),
+                    if (widget.onAlbum != null)
+                      PopupMenuItem(
+                          value: widget.onAlbum, child: const Text('Альбом')),
+                    if (widget.onPlaylist != null)
+                      PopupMenuItem(
+                          value: widget.onPlaylist,
+                          child: const Text('В плейлист')),
+                    if (widget.onRemove != null)
+                      PopupMenuItem(
+                          value: widget.onRemove, child: const Text('Удалить')),
+                  ],
                 ),
               ],
             ),
           ),
         ),
       ),
-    );
-  }
-}
-
-class _TrackAlbum extends StatelessWidget {
-  const _TrackAlbum({
-    required this.title,
-    required this.onTap,
-  });
-
-  final String? title;
-  final VoidCallback? onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final albumTitle = (title ?? '').trim();
-    final textStyle = Theme.of(context).textTheme.bodySmall;
-    final text = Text(
-      albumTitle.isEmpty ? 'Альбом не указан' : albumTitle,
-      maxLines: 1,
-      overflow: TextOverflow.ellipsis,
-      style: albumTitle.isEmpty || onTap == null
-          ? textStyle
-          : textStyle?.copyWith(
-              color: AppTheme.textPrimary,
-              decoration: TextDecoration.underline,
-              decorationColor: AppTheme.textMuted,
-            ),
-    );
-
-    if (albumTitle.isEmpty || onTap == null) return text;
-    return InkWell(
-      borderRadius: BorderRadius.circular(6),
-      onTap: onTap,
-      child: text,
     );
   }
 }

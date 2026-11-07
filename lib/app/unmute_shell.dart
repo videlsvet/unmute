@@ -1,3 +1,4 @@
+import '../features/profile/service_settings_page.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -337,6 +338,7 @@ class _UnmuteShellState extends State<UnmuteShell> {
                 authService: _authService,
                 profileService: _profileService,
                 onLogout: _logout,
+                onSettings: () => _setSection(AppSection.settings),
               );
       case AppSection.artists:
         return _CollectionPage(
@@ -367,13 +369,10 @@ class _UnmuteShellState extends State<UnmuteShell> {
           onOpenAlbum: _openAlbumFromTrack,
         );
       case AppSection.settings:
-        return _ComingSoonPage(
-          title: 'Настройки',
-          subtitle:
-              'Звук, горячие клавиши, источники и внешний вид будут жить здесь.',
-          icon: Icons.tune_rounded,
-          action: () => _setSection(AppSection.profile),
-        );
+        return _token == null
+            ? AuthRedesignPage(
+                authService: _authService, onLoggedIn: _handleLoggedIn)
+            : ServiceSettingsPage(token: _token!, service: _profileService);
     }
   }
 
@@ -652,34 +651,6 @@ class _NextTrackIntent extends Intent {
 
 class _PreviousTrackIntent extends Intent {
   const _PreviousTrackIntent();
-}
-
-class _ComingSoonPage extends StatelessWidget {
-  const _ComingSoonPage({
-    required this.title,
-    required this.subtitle,
-    required this.icon,
-    required this.action,
-  });
-
-  final String title;
-  final String subtitle;
-  final IconData icon;
-  final VoidCallback action;
-
-  @override
-  Widget build(BuildContext context) {
-    return EmptyStateWidget(
-      title: title,
-      subtitle: subtitle,
-      icon: icon,
-      action: ElevatedButton.icon(
-        onPressed: action,
-        icon: const Icon(Icons.arrow_forward_rounded),
-        label: const Text('Перейти дальше'),
-      ),
-    );
-  }
 }
 
 class _CollectionPage extends StatelessWidget {

@@ -14,7 +14,7 @@ class PlayerController extends ChangeNotifier {
   static const Duration _completionGraceWindow = Duration(seconds: 3);
   static const Duration _completionTolerance = Duration(seconds: 2);
 
-  final mk.Player _player = mk.Player();
+  final mk.Player _player;
   final Random _random = Random();
   final LyricsService _lyricsService = LyricsService();
   Future<Track> Function(Track track)? prepareTrackForPlayback;
@@ -39,8 +39,11 @@ class PlayerController extends ChangeNotifier {
   StreamSubscription<String>? _errorSub;
   StreamSubscription<bool>? _completedSub;
   DateTime? _lastPlaybackErrorAt;
+  bool _advancing = false;
+  bool _opening = false;
+  bool _waitingForQueue = false;
 
-  PlayerController() {
+  PlayerController({mk.Player? player}) : _player = player ?? mk.Player() {
     unawaited(_player.setVolume(volume));
 
     _playingSub = _player.stream.playing.listen((value) {
@@ -130,6 +133,10 @@ class PlayerController extends ChangeNotifier {
     if (tracks.isEmpty) return;
     final updated = List<Track>.from(_queue)..addAll(tracks);
     _queue = List<Track>.unmodifiable(updated);
+    if (_waitingForQueue && isWavePlayback) {
+      _waitingForQueue = false;
+      unawaited(playNext());
+    }
     notifyListeners();
   }
 
@@ -191,10 +198,9 @@ class PlayerController extends ChangeNotifier {
   }
 
   Future<void> _playTrackInternal(Track track) async {
-    var preparedTrack = track;
-    if (!preparedTrack.hasPlayableUrl) {
-      preparedTrack = await _prepareTrack(track);
-    }
+    _opening = true;
+    _waitingForQueue = false;
+    final preparedTrack = await _prepareTrack(track);
     var url = (preparedTrack.preview ?? '').trim();
 
     if (url.isEmpty) {
@@ -204,6 +210,7 @@ class PlayerController extends ChangeNotifier {
       position = Duration.zero;
       duration = Duration.zero;
       isPlaying = false;
+      _opening = false;
       error = 'У трека нет ссылки на воспроизведение';
       notifyListeners();
       return;
@@ -243,6 +250,8 @@ class PlayerController extends ChangeNotifier {
       error = 'Ошибка воспроизведения: $e';
       isPlaying = false;
       notifyListeners();
+    } finally {
+      _opening = false;
     }
   }
 
@@ -267,21 +276,21 @@ class PlayerController extends ChangeNotifier {
   }
 
   Future<void> _handleTrackCompleted() async {
-    if (_shouldIgnoreCompletedEvent()) {
-      isPlaying = false;
-      notifyListeners();
-      return;
+    if (_opening || _advancing || _shouldIgnoreCompletedEvent()) return;
+    _advancing = true;
+    try {
+      _lastPlaybackErrorAt = null;
+      final nextIndex = _findNextPlayableIndex();
+      if (nextIndex == -1) {
+        _waitingForQueue = isWavePlayback;
+        isPlaying = false;
+        notifyListeners();
+        return;
+      }
+      await playNext();
+    } finally {
+      _advancing = false;
     }
-
-    _lastPlaybackErrorAt = null;
-
-    final nextIndex = _findNextPlayableIndex();
-    if (nextIndex == -1) {
-      isPlaying = false;
-      notifyListeners();
-      return;
-    }
-    await playNext();
   }
 
   bool _shouldIgnoreCompletedEvent() {
@@ -302,14 +311,17 @@ class PlayerController extends ChangeNotifier {
   int _findPreviousPlayableIndex() {
     if (_queue.isEmpty || _currentIndex < 0) return -1;
 
-    if (shuffleEnabled && _queue.where((track) => track.hasPlayableUrl).length > 1) {
+    if (shuffleEnabled &&
+        _queue.where((track) => track.hasPlayableUrl).length > 1) {
       final candidates = <int>[];
       for (var i = 0; i < _queue.length; i++) {
         if (i != _currentIndex && _queue[i].hasPlayableUrl) {
           candidates.add(i);
         }
       }
-      return candidates.isEmpty ? -1 : candidates[_random.nextInt(candidates.length)];
+      return candidates.isEmpty
+          ? -1
+          : candidates[_random.nextInt(candidates.length)];
     }
 
     for (var i = _currentIndex - 1; i >= 0; i--) {
@@ -325,14 +337,17 @@ class PlayerController extends ChangeNotifier {
       return _currentIndex;
     }
 
-    if (shuffleEnabled && _queue.where((track) => track.hasPlayableUrl).length > 1) {
+    if (shuffleEnabled &&
+        _queue.where((track) => track.hasPlayableUrl).length > 1) {
       final candidates = <int>[];
       for (var i = 0; i < _queue.length; i++) {
         if (i != _currentIndex && _queue[i].hasPlayableUrl) {
           candidates.add(i);
         }
       }
-      return candidates.isEmpty ? -1 : candidates[_random.nextInt(candidates.length)];
+      return candidates.isEmpty
+          ? -1
+          : candidates[_random.nextInt(candidates.length)];
     }
 
     for (var i = _currentIndex + 1; i < _queue.length; i++) {

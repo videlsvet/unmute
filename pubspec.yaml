@@ -30,6 +30,7 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
+  image_picker: ^1.2.0
   http: ^1.2.1
   shared_preferences: ^2.2.3
   media_kit: ^1.1.11

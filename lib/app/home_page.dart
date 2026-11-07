@@ -431,7 +431,7 @@ class _SpotifyMobileWaveBanner extends StatelessWidget {
           end: Alignment.bottomRight,
           colors: [
             AppTheme.accent.withValues(alpha: 0.42),
-            const Color(0xFF20233B),
+            const Color(0xFF351920),
             AppTheme.surfaceRaised,
           ],
         ),

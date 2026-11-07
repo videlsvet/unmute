@@ -3,17 +3,17 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 
 class AppTheme {
-  static const Color background = Color(0xFF0C0D12);
+  static const Color background = Color(0xFF0D0D0F);
   static const Color backgroundElevated = Color(0xFF11131B);
-  static const Color surface = Color(0xFF181B25);
-  static const Color surfaceSoft = Color(0xFF202432);
+  static const Color surface = Color(0xFF1C1C1E);
+  static const Color surfaceSoft = Color(0xFF262628);
   static const Color surfaceMuted = Color(0xFF242424);
   static const Color surfaceRaised = Color(0xFF303030);
   static const Color surfaceHighest = Color(0xFF383838);
   static const Color stroke = Color(0xFF282828);
   static const Color strokeSoft = Color(0xFF3A3A3A);
-  static const Color accent = Color(0xFF9CADFF);
-  static const Color accent2 = Color(0xFF80D9D0);
+  static const Color accent = Color(0xFFFA3655);
+  static const Color accent2 = Color(0xFFFF7286);
   static const Color accentWarm = Color(0xFFFF4D6D);
   static const Color accentAmber = Color(0xFFFFB703);
   static const Color accentPurple = Color(0xFFA855F7);

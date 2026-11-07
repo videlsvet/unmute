@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 
 import '../core/models/track.dart';
 import '../theme/app_theme.dart';
-import 'service_chip.dart';
 import 'ui_kit.dart';
 
 class TrackTile extends StatelessWidget {
@@ -70,26 +69,11 @@ class TrackTile extends StatelessWidget {
         color: Colors.transparent,
         child: InkWell(
           borderRadius: BorderRadius.circular(24),
-          onTap: onTap,
+          onTap: onTap ?? onPlay,
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
             child: Row(
               children: [
-                SizedBox(
-                  width: 32,
-                  child: isCurrent
-                      ? const Icon(
-                          Icons.graphic_eq_rounded,
-                          color: AppTheme.accent,
-                          size: 18,
-                        )
-                      : Text(
-                          index == null ? '' : '${index! + 1}',
-                          textAlign: TextAlign.center,
-                          style: Theme.of(context).textTheme.bodySmall,
-                        ),
-                ),
-                const SizedBox(width: 8),
                 UnmuteArtwork(imageUrl: track.image, size: 54, radius: 18),
                 const SizedBox(width: 12),
                 Expanded(
@@ -126,122 +110,40 @@ class TrackTile extends StatelessWidget {
                                   ),
                         ),
                       ),
-                      const SizedBox(height: 8),
-                      Wrap(
-                        spacing: 6,
-                        runSpacing: 4,
-                        children: [
-                          if (track.source.trim().isNotEmpty)
-                            ServiceChip(label: track.source),
-                          if ((track.albumTitle ?? '').trim().isNotEmpty)
-                            InkWell(
-                              borderRadius: BorderRadius.circular(999),
-                              onTap: onAlbum,
-                              child: ServiceChip(
-                                label: track.albumTitle!,
-                                icon: Icons.album_rounded,
-                              ),
-                            ),
-                          if (!track.hasPlayableUrl)
-                            const ServiceChip(
-                              label: 'Нет превью',
-                              icon: Icons.block_rounded,
-                            ),
-                        ],
-                      ),
                     ],
                   ),
                 ),
                 const SizedBox(width: 12),
-                Wrap(
-                  spacing: 6,
-                  runSpacing: 6,
-                  children: [
+                PopupMenuButton<VoidCallback>(
+                  tooltip: 'Действия с треком',
+                  icon: const Icon(Icons.more_horiz_rounded),
+                  onSelected: (action) => action(),
+                  itemBuilder: (_) => [
                     if (onFavorite != null)
-                      _ActionButton(
-                        icon: isFavorite
-                            ? Icons.favorite_rounded
-                            : Icons.favorite_border_rounded,
-                        color: const Color(0xFFFF708C),
-                        tooltip: 'В избранное',
-                        onPressed: onFavorite,
-                      ),
+                      PopupMenuItem(
+                          value: onFavorite,
+                          child: Text(isFavorite
+                              ? 'Убрать из избранного'
+                              : 'В избранное')),
                     if (onArtist != null)
-                      _ActionButton(
-                        icon: Icons.person_outline_rounded,
-                        tooltip: 'Открыть артиста',
-                        onPressed: onArtist,
-                      ),
+                      PopupMenuItem(
+                          value: onArtist,
+                          child: const Text('Открыть исполнителя')),
                     if (onAlbum != null)
-                      _ActionButton(
-                        icon: Icons.album_outlined,
-                        tooltip: 'Открыть альбом',
-                        onPressed: onAlbum,
-                      ),
+                      PopupMenuItem(
+                          value: onAlbum, child: const Text('Открыть альбом')),
                     if (onPlaylist != null)
-                      _ActionButton(
-                        icon: Icons.playlist_add_rounded,
-                        tooltip: 'Добавить в плейлист',
-                        onPressed: onPlaylist,
-                      ),
+                      PopupMenuItem(
+                          value: onPlaylist,
+                          child: const Text('Добавить в плейлист')),
                     if (onRemove != null)
-                      _ActionButton(
-                        icon: Icons.delete_outline_rounded,
-                        tooltip: 'Удалить',
-                        onPressed: onRemove,
-                      ),
-                    if (onPlay != null)
-                      _ActionButton(
-                        icon: Icons.play_arrow_rounded,
-                        color: Colors.white,
-                        filled: true,
-                        tooltip: 'Слушать',
-                        onPressed: onPlay,
-                      ),
+                      PopupMenuItem(
+                          value: onRemove, child: const Text('Удалить')),
                   ],
                 ),
               ],
             ),
           ),
-        ),
-      ),
-    );
-  }
-}
-
-class _ActionButton extends StatelessWidget {
-  const _ActionButton({
-    required this.icon,
-    required this.tooltip,
-    required this.onPressed,
-    this.color = AppTheme.textSecondary,
-    this.filled = false,
-  });
-
-  final IconData icon;
-  final String tooltip;
-  final VoidCallback? onPressed;
-  final Color color;
-  final bool filled;
-
-  @override
-  Widget build(BuildContext context) {
-    return Tooltip(
-      message: tooltip,
-      child: InkWell(
-        borderRadius: BorderRadius.circular(16),
-        onTap: onPressed,
-        child: Ink(
-          width: 38,
-          height: 38,
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(14),
-            color: filled
-                ? AppTheme.accent.withValues(alpha: 0.94)
-                : AppTheme.surfaceMuted.withValues(alpha: 0.72),
-            border: Border.all(color: AppTheme.stroke),
-          ),
-          child: Icon(icon, size: 18, color: color),
         ),
       ),
     );
